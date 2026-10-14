@@ -24,6 +24,7 @@ import numpy as np
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import attn  # noqa: E402
+import runner  # noqa: E402
 
 SEED = 20261014
 CHECK_STREAM = 6
@@ -62,16 +63,24 @@ def draw(i):
     return spec, hw
 
 
+def _case_task(t):
+    i, tools = t
+    spec, hw = draw(i)
+    return spec, hw, attn.run_attention(spec, hw, tools, check=True, fp64=False)
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--tools", required=True)
     ap.add_argument("--cases", type=int, default=80)
     ap.add_argument("--csv")
+    runner.add_jobs_arg(ap)
     args = ap.parse_args()
     rows = []
-    for i in range(args.cases):
-        spec, hw = draw(i)
-        out = attn.run_attention(spec, hw, args.tools, check=True, fp64=False)
+    for (i, _), res, err in runner.run_tasks([(i, args.tools) for i in range(args.cases)], _case_task, args.jobs):
+        if err is not None:
+            raise RuntimeError(f"case {i}: {err}")
+        spec, hw, out = res
         c = out["check"]
         row = dict(case=i, mode=spec["mode"], prec=spec["prec"], p_scale=spec["p_scale"], d=spec["d"],
                    L=spec.get("L", ""), T=spec.get("T", ""), g=spec.get("g", ""), px=hw["px"], py=hw["py"],

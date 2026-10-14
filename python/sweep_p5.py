@@ -24,6 +24,7 @@ import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import attn  # noqa: E402
+import runner  # noqa: E402
 import study_p4  # noqa: E402
 
 PRECS = ("int8", "fp16", "bf16", "fp32")
@@ -216,18 +217,20 @@ def main():
     ap.add_argument("--tools", required=True)
     ap.add_argument("--out-dir", required=True)
     ap.add_argument("--phase4-study", default="results/phase4/study.csv")
+    runner.add_jobs_arg(ap)
     args = ap.parse_args()
     os.makedirs(args.out_dir, exist_ok=True)
     p4 = phase4_rows(args.phase4_study)
     start = time.time()
     rows, failures = [], []
     progs = programs()
-    for s in progs:
-        try:
-            row = study_p4.run_one(dict(s), args.tools, failures, s["hw"])
-        except Exception as ex:  # noqa: BLE001 - every failure is reported
-            failures.append(f"program {s['id']}: {ex}")
+    results = runner.run_tasks([(dict(s), args.tools, s["hw"]) for s in progs], study_p4.run_one_task, args.jobs)
+    for s, (_, res, exc) in zip(progs, results):
+        if exc is not None:
+            failures.append(f"program {s['id']}: {exc}")
             continue
+        row, fails = res
+        failures += fails
         row.update(id=s["id"], sweep=s["sweep"], arrangement=s["arrangement"], dram_map=s["hw"]["dram_map"],
                    group=s["group"])
         row["phase4_cycles_equal"] = ""

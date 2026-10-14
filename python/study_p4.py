@@ -29,6 +29,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import attn  # noqa: E402
 import numerics as nx  # noqa: E402
 from roofline import ceilings, gemm_bounds, vu_bounds  # noqa: E402
+import runner  # noqa: E402
 
 PRECS = ("int8", "fp16", "bf16", "fp32")
 OPS = ("qk", "softmax", "pv")
@@ -138,6 +139,26 @@ def run_one(s, tools, failures, hw=None):
         failures.append(f"study {s['id']}: not bit-exact three ways: "
                         + " ".join(k for k, v in out["check"].items() if not v))
     return row
+
+
+def run_one_task(t):
+    """run_one in a worker process: returns the row and that program's assertion failures."""
+    s, tools, hw = t
+    failures = []
+    return run_one(s, tools, failures, hw), failures
+
+
+def run_programs(progs, tools, jobs, hw_of=lambda s: None, label="study"):
+    """Runs programs in parallel (python/runner.py); rows and failures come back in program order."""
+    rows, failures = [], []
+    for s, res, exc in runner.run_tasks([(s, tools, hw_of(s)) for s in progs], run_one_task, jobs):
+        if exc is not None:
+            failures.append(f"{label} {s[0]['id']}: {exc}")
+            continue
+        row, fails = res
+        rows.append(row)
+        failures += fails
+    return rows, failures
 
 
 def find(rows, **kw):
@@ -318,15 +339,11 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--tools", required=True)
     ap.add_argument("--out-dir", required=True)
+    runner.add_jobs_arg(ap)
     args = ap.parse_args()
     os.makedirs(args.out_dir, exist_ok=True)
     start = time.time()
-    rows, failures = [], []
-    for s in studies():
-        try:
-            rows.append(run_one(s, args.tools, failures))
-        except Exception as ex:  # noqa: BLE001 - every failure is reported, none hidden
-            failures.append(f"study {s['id']}: {ex}")
+    rows, failures = run_programs(studies(), args.tools, args.jobs)
     wall = int(time.time() - start)
     keys = []
     for r in rows:

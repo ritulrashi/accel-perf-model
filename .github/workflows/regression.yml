@@ -1,0 +1,76 @@
+# Regression on every push and pull request; everything under ASan plus all
+# mutation checks nightly and on demand (docs/phase6-design.md §3). The
+# toolchain comes from the same .devcontainer/setup.sh as the Codespace, so
+# CI and development use identical versions; the logs print them.
+name: regression
+
+on:
+  push:
+  pull_request:
+  schedule:
+    - cron: "23 5 * * *"   # nightly full run
+  workflow_dispatch:
+
+jobs:
+  regression:
+    if: github.event_name == 'push' || github.event_name == 'pull_request'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - name: Prepare the SystemC prefix for the cache
+        run: sudo mkdir -p /opt/systemc-3.0.2 && sudo chown "$USER" /opt/systemc-3.0.2
+      - name: Restore SystemC (pinned commit)
+        uses: actions/cache@v4
+        with:
+          path: /opt/systemc-3.0.2
+          key: systemc-3.0.2-70b0fc8e4a74acc677b0fc73cea08f940c2115d5-ubuntu-24.04
+      - name: Install toolchain (same script as the dev container)
+        run: bash .devcontainer/setup.sh
+      - name: Tool versions
+        run: scripts/env_report.sh
+      - name: Regression (release + RTL, ASan, RESULTS.md numbers, reproduction of every results CSV)
+        run: bash scripts/phase6_regression.sh
+      - name: Timing summary
+        if: always()
+        run: cat build/logs/regression_runtime.txt >> "$GITHUB_STEP_SUMMARY" || true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: regression-logs
+          path: |
+            build/logs/
+            build/release/Testing/Temporary/LastTest.log
+            build/asan/Testing/Temporary/LastTest.log
+          if-no-files-found: ignore
+
+  full:
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 240
+    steps:
+      - uses: actions/checkout@v4
+      - name: Prepare the SystemC prefix for the cache
+        run: sudo mkdir -p /opt/systemc-3.0.2 && sudo chown "$USER" /opt/systemc-3.0.2
+      - name: Restore SystemC (pinned commit)
+        uses: actions/cache@v4
+        with:
+          path: /opt/systemc-3.0.2
+          key: systemc-3.0.2-70b0fc8e4a74acc677b0fc73cea08f940c2115d5-ubuntu-24.04
+      - name: Install toolchain (same script as the dev container)
+        run: bash .devcontainer/setup.sh
+      - name: Tool versions
+        run: scripts/env_report.sh
+      - name: Full regression (ASan with RTL, mutation checks of Phases 1-5)
+        run: bash scripts/phase6_regression.sh --full
+      - name: Timing summary
+        if: always()
+        run: cat build/logs/regression_runtime.txt >> "$GITHUB_STEP_SUMMARY" || true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: full-regression-logs
+          path: |
+            build/logs/
+            results/phase*/mutation_check.txt
+          if-no-files-found: ignore

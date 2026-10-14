@@ -34,6 +34,7 @@ import numpy as np
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import numerics as nx  # noqa: E402
+import runner  # noqa: E402
 
 SEED = 20261014
 ACCEL_STREAM = 3  # separate stream so Phase 2 cases stay exactly as published
@@ -177,6 +178,15 @@ def run_case(i, target, model, gemm_ref, tmp):
     return p
 
 
+def _case_task(t):
+    """One case in its own temporary directory: cases run in parallel (python/runner.py)."""
+    _, target, prec, idx, model, gemm_ref = t
+    with tempfile.TemporaryDirectory() as tmp:
+        if prec:
+            return run_case_prec(idx, prec, model, gemm_ref, tmp)
+        return run_case(idx, target, model, gemm_ref, tmp)
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--target", choices=("pe", "accel"), default="pe")
@@ -187,6 +197,7 @@ def main():
     ap.add_argument("--prec", choices=nx.PRECS + ("all",),
                     help="Phase 4 precision cases on the grid (default: the Phase 2/3 INT8 streams)")
     ap.add_argument("--csv")
+    runner.add_jobs_arg(ap)
     args = ap.parse_args()
     if args.prec and args.target != "accel":
         ap.error("--prec needs --target accel")
@@ -194,22 +205,21 @@ def main():
     if not model:
         ap.error(f"--target {args.target} needs --apm-{'gemm' if args.target == 'pe' else 'accel'}")
 
+    precs = None if not args.prec else (nx.PRECS if args.prec == "all" else (args.prec,))
+    tasks = [(i, args.target, precs[i % len(precs)] if precs else None, i // len(precs) if precs else i,
+              model, args.gemm_ref) for i in range(args.cases)]
     rows = []
-    with tempfile.TemporaryDirectory() as tmp:
-        precs = None if not args.prec else (nx.PRECS if args.prec == "all" else (args.prec,))
-        for i in range(args.cases):
-            if precs:
-                row = run_case_prec(i // len(precs), precs[i % len(precs)], model, args.gemm_ref, tmp)
-            else:
-                row = run_case(i, args.target, model, args.gemm_ref, tmp)
-            rows.append(row)
-            shape = " ".join(f"{k}={row[k]}" for k in row
-                             if k not in ("case", "extreme", "cycles", "model_eq_numpy", "cpp_eq_numpy",
-                                          "model_eq_cpp", "model_mismatches", "match"))
-            flag = "OK" if row["match"] else "MISMATCH"
-            print(f"case {i}: {shape} extreme={int(row['extreme'])} cycles={row['cycles']} "
-                  f"model==numpy={int(row['model_eq_numpy'])} cpp==numpy={int(row['cpp_eq_numpy'])} "
-                  f"model==cpp={int(row['model_eq_cpp'])} {flag}")
+    for (i, *_), row, err in runner.run_tasks(tasks, _case_task, args.jobs):
+        if err is not None:
+            raise RuntimeError(f"case {i}: {err}")
+        rows.append(row)
+        shape = " ".join(f"{k}={row[k]}" for k in row
+                         if k not in ("case", "extreme", "cycles", "model_eq_numpy", "cpp_eq_numpy",
+                                      "model_eq_cpp", "model_mismatches", "match"))
+        flag = "OK" if row["match"] else "MISMATCH"
+        print(f"case {i}: {shape} extreme={int(row['extreme'])} cycles={row['cycles']} "
+              f"model==numpy={int(row['model_eq_numpy'])} cpp==numpy={int(row['cpp_eq_numpy'])} "
+              f"model==cpp={int(row['model_eq_cpp'])} {flag}")
     if args.csv:
         with open(args.csv, "w", newline="") as f:
             w = csv.DictWriter(f, fieldnames=list(rows[0].keys()), lineterminator="\n")

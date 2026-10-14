@@ -30,6 +30,7 @@ import tempfile
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import attn  # noqa: E402
 import gemm_check  # noqa: E402
+import runner  # noqa: E402
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 ENV = dict(os.environ, SYSTEMC_DISABLE_COPYRIGHT_MESSAGE="1")
@@ -74,60 +75,63 @@ def gemm_args(p, keys):
     return [f"{k}={p[k]}" for k in keys]
 
 
-def schedules(args, work):
-    """Yields (set, case, schedule path, expect-trace path or None, expected tile dones or None)."""
-    for h in ("ht1", "ht2"):
-        yield "hand", h, os.path.join(ROOT, "tests/rtl", h + ".sched"), os.path.join(ROOT, "tests/rtl", h + ".trace"), None
+def task_list(args):
+    """Every case of the program set, in report order (python/runner.py keeps that order)."""
+    t = [("hand", h) for h in ("ht1", "ht2")]
+    t += [("p2dir", k) for k in range(len(P2_DIRECTED))]
+    t += [("p2rand", i) for i in range(10 if args.quick else 200)]
+    t += [("p3rand", i) for i in range(5 if args.quick else 100)]
+    if not args.quick:
+        t += [("attn", "prefill"), ("attn", "decode")]
+    return [(kind, key, args.tools) for kind, key in t]
+
+
+def make_schedules(kind, key, tools, work):
+    """Runs the model for one case; returns [(set, case, schedule path, expect-trace or None, hand dones or None)]."""
+    if kind == "hand":
+        return [("hand", key, os.path.join(ROOT, "tests/rtl", key + ".sched"), os.path.join(ROOT, "tests/rtl", key + ".trace"), None)]
     a_path, b_path, c_path = (os.path.join(work, n) for n in ("a.bin", "b.bin", "c.bin"))
-    for name, shape, dones in P2_DIRECTED:
+    if kind == "p2dir":
+        name, shape, dones = P2_DIRECTED[key]
         p = dict(P2, **shape)
         a, b = gemm_check.draw_operands(gemm_check.np.random.default_rng([7, len(name)]), p["M"], p["N"], p["K"])[1:]
         a.tofile(a_path)
         b.tofile(b_path)
         sched = os.path.join(work, f"{name}.sched")
-        run([os.path.join(args.tools, "apm_gemm")] + gemm_args(p, ("M", "N", "K", "R", "C", "Kt", "nbuf", "nout",
-                                                                    "dram_w", "t_hit", "t_miss", "dram_q", "dma_m"))
+        run([os.path.join(tools, "apm_gemm")] + gemm_args(p, ("M", "N", "K", "R", "C", "Kt", "nbuf", "nout",
+                                                               "dram_w", "t_hit", "t_miss", "dram_q", "dma_m"))
             + [f"a={a_path}", f"b={b_path}", f"out={c_path}", f"schedule={sched}"])
-        yield "p2dir", name, sched, None, dones
-    n2 = 10 if args.quick else 200
-    for i in range(n2):
-        p, a, b = gemm_check.draw_case_pe(i)
+        return [("p2dir", name, sched, None, dones)]
+    if kind == "p2rand":
+        p, a, b = gemm_check.draw_case_pe(key)
         a.tofile(a_path)
         b.tofile(b_path)
-        sched = os.path.join(work, f"p2_{i}.sched")
-        run([os.path.join(args.tools, "apm_gemm")] + gemm_args(p, ("M", "N", "K", "R", "C", "Kt", "nbuf", "nout"))
+        sched = os.path.join(work, f"p2_{key}.sched")
+        run([os.path.join(tools, "apm_gemm")] + gemm_args(p, ("M", "N", "K", "R", "C", "Kt", "nbuf", "nout"))
             + [f"a={a_path}", f"b={b_path}", f"out={c_path}", f"schedule={sched}"])
-        yield "p2rand", str(i), sched, None, None
-    n3 = 5 if args.quick else 100
-    for i in range(n3):
-        p, a, b = gemm_check.draw_case_accel(i)
+        return [("p2rand", str(key), sched, None, None)]
+    if kind == "p3rand":
+        p, a, b = gemm_check.draw_case_accel(key)
         a.tofile(a_path)
         b.tofile(b_path)
-        sched = os.path.join(work, f"p3_{i}.sched")
-        run([os.path.join(args.tools, "apm_accel")]
+        sched = os.path.join(work, f"p3_{key}.sched")
+        run([os.path.join(tools, "apm_accel")]
             + gemm_args(p, ("M", "N", "K", "R", "C", "Kt", "px", "py", "sram_x", "sram_y", "D", "nbuf", "nout"))
             + [f"a={a_path}", f"b={b_path}", f"out={c_path}", f"schedule={sched}"])
-        yield "p3rand", str(i), sched, None, None
-    if not args.quick:
-        for spec in (dict(mode="prefill", L=256, d=64, prec="int8", p_scale="row", mapping="auto", seed=0),
-                     dict(mode="decode", T=4096, g=8, d=64, prec="int8", p_scale="row", mapping="auto", seed=0)):
-            d = os.path.join(work, f"attn_{spec['mode']}")
-            os.makedirs(d, exist_ok=True)
-            attn.run_attention(spec, dict(attn.HW_A4), args.tools, check=False, fp64=False, schedule_dir=d)
-            for op in ("qk", "pv"):
-                yield "attn", f"{spec['mode']}_{op}", os.path.join(d, op + ".sched"), None, None
+        return [("p3rand", str(key), sched, None, None)]
+    spec = (dict(mode="prefill", L=256, d=64, prec="int8", p_scale="row", mapping="auto", seed=0) if key == "prefill"
+            else dict(mode="decode", T=4096, g=8, d=64, prec="int8", p_scale="row", mapping="auto", seed=0))
+    attn.run_attention(spec, dict(attn.HW_A4), tools, check=False, fp64=False, schedule_dir=work)
+    return [("attn", f"{key}_{op}", os.path.join(work, op + ".sched"), None, None) for op in ("qk", "pv")]
 
 
-def main():
-    ap = argparse.ArgumentParser()
-    ap.add_argument("--tools", required=True)
-    ap.add_argument("--quick", action="store_true")
-    ap.add_argument("--csv")
-    args = ap.parse_args()
+def check_task(t):
+    """One case end to end in its own directory: model run(s), then os_array_tb on each schedule."""
+    kind, key, tools = t
     rows = []
     with tempfile.TemporaryDirectory() as work:
-        for set_, case, sched, expect, dones in schedules(args, work):
-            rc, f, err = tb(args.tools, sched, expect)
+        for set_, case, sched, expect, dones in make_schedules(kind, key, tools, work):
+            rc, f, err = tb(tools, sched, expect)
             row = dict(set=set_, case=case, pes=f.get("pes", ""), tiles=f.get("tiles", ""), cycles=f.get("cycles", ""),
                        macs=f.get("macs", ""), trace_lines=f.get("trace_lines", ""), hand=f.get("hand", "n/a"),
                        result=f.get("result", "ERROR"), exit=rc)
@@ -138,9 +142,25 @@ def main():
                 row["hand_dones"] = "n/a"
             row["match"] = int(rc == 0 and row["result"] == "MATCH" and row["hand"] in ("ok", "n/a")
                                and row["hand_dones"] in ("ok", "n/a"))
+            rows.append((row, err))
+    return rows
+
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--tools", required=True)
+    ap.add_argument("--quick", action="store_true")
+    ap.add_argument("--csv")
+    runner.add_jobs_arg(ap)
+    args = ap.parse_args()
+    rows = []
+    for (kind, key, _), res, exc in runner.run_tasks(task_list(args), check_task, args.jobs):
+        if exc is not None:
+            raise RuntimeError(f"{kind} {key}: {exc}")
+        for row, err in res:
             rows.append(row)
-            print(f"{set_} {case}: pes={row['pes']} tiles={row['tiles']} cycles={row['cycles']} macs={row['macs']} "
-                  f"hand_trace={row['hand']} hand_dones={row['hand_dones']} {row['result']}"
+            print(f"{row['set']} {row['case']}: pes={row['pes']} tiles={row['tiles']} cycles={row['cycles']} "
+                  f"macs={row['macs']} hand_trace={row['hand']} hand_dones={row['hand_dones']} {row['result']}"
                   + ("" if row["match"] else f"  <-- {err}"))
     if args.csv:
         with open(args.csv, "w", newline="") as fh:

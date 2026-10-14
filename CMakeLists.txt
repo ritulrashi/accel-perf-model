@@ -148,6 +148,20 @@ add_test(NAME functional.attn10
           --tools $<TARGET_FILE_DIR:apm_op> --cases 10)
 set_tests_properties(functional.accel_prec20 functional.attn10 PROPERTIES LABELS functional)
 
+# Phase 6: the parallel runner keeps output in task order; reproduction
+# compares regenerated CSVs byte for byte (docs/phase6-design.md §1-§2, §5).
+add_test(NAME runner.selftest COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/python/runner.py --selftest)
+add_test(NAME runner.reproduce_selftest
+         COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/python/reproduce.py --selftest)
+add_test(NAME runner.jobs_gemm
+  COMMAND ${CMAKE_COMMAND} "-DARGS=${Python3_EXECUTABLE};${CMAKE_SOURCE_DIR}/python/gemm_check.py;--target;accel;--prec;all;--apm-accel;$<TARGET_FILE:apm_accel>;--gemm-ref;$<TARGET_FILE:gemm_ref>;--cases;24"
+          -DOUT=${CMAKE_BINARY_DIR}/jobs_gemm -P ${CMAKE_SOURCE_DIR}/tests/jobs_determinism.cmake)
+add_test(NAME runner.jobs_attn
+  COMMAND ${CMAKE_COMMAND} "-DARGS=${Python3_EXECUTABLE};${CMAKE_SOURCE_DIR}/python/attn_check.py;--tools;$<TARGET_FILE_DIR:apm_op>;--cases;6"
+          -DOUT=${CMAKE_BINARY_DIR}/jobs_attn -P ${CMAKE_SOURCE_DIR}/tests/jobs_determinism.cmake)
+set_tests_properties(runner.selftest runner.reproduce_selftest runner.jobs_gemm runner.jobs_attn
+                     PROPERTIES LABELS runner ENVIRONMENT "SYSTEMC_DISABLE_COPYRIGHT_MESSAGE=1")
+
 # Phase 5 part A: SystemVerilog array, Verilator testbench, RTL tests.
 option(APM_RTL "Build the SystemVerilog array and its Verilator testbench (Phase 5)" ON)
 if(APM_RTL)

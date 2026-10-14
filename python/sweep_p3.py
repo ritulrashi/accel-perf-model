@@ -26,6 +26,7 @@ import numpy as np
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from roofline import ceilings  # noqa: E402
+import runner  # noqa: E402
 
 SWEEP_SEED = 20261014
 RANDOM_CONFIGS = 104
@@ -104,16 +105,26 @@ def run(apm_accel, cfg):
     return p.returncode, p.stdout, p.stderr.strip()
 
 
+def _run_task(t):
+    return run(*t)
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--apm-accel", required=True)
     ap.add_argument("--out-dir", required=True)
+    runner.add_jobs_arg(ap)
     args = ap.parse_args()
     os.makedirs(args.out_dir, exist_ok=True)
 
     rows, failures = [], []
-    for cfg in all_configs():
-        rc, out, err = run(args.apm_accel, cfg)
+    cfgs = all_configs()
+    # Simulations run in parallel (python/runner.py); results come back in config order.
+    runs = runner.run_tasks([(args.apm_accel, c) for c in cfgs], _run_task, args.jobs)
+    for cfg, (_, res, exc) in zip(cfgs, runs):
+        if exc is not None:
+            raise exc
+        rc, out, err = res
         if rc != 0:
             failures.append(f"config {cfg['id']}: apm_accel exit {rc}: {err}")
             continue
