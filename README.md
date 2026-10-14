@@ -53,6 +53,7 @@ build/release/apm_scenario t2            # one scenario, JSON cycles and counter
 
 | Result | Command | Output |
 |---|---|---|
+| All Phase 1 results, each on a clean tree | `scripts/phase1_results.sh` | both files below |
 | Phase 1 exit criterion (hand-derived cycles, both presets) | `scripts/phase1_exit.sh` | `results/phase1/exit_criterion.txt` |
 | Phase 1 mutation check | `scripts/phase1_mutation_check.sh` | `results/phase1/mutation_check.txt` |
 

@@ -22,7 +22,9 @@ git ls-files -z | tar --null -T - -cf - | tar -xf - -C "$work"
 failed_tests() {  # prints the names of failing ctest tests, one per line
   (cd "$work" && ctest --preset release -j"$(nproc)" > "$stage/ctest.log" 2>&1) || true
   sed -n '/The following tests FAILED/,$p' "$stage/ctest.log" \
-    | grep -oE '[0-9]+ - [A-Za-z0-9_.]+' | sed -E 's/^[0-9]+ - //' | sort
+    | grep -oE '[0-9]+ - [A-Za-z0-9_.]+' | sed -E 's/^[0-9]+ - //' | sort || true
+  # With no failures grep exits 1; without "|| true", pipefail + set -e
+  # would abort the whole script (docs/BUGS.md #1).
 }
 
 # name | file | sed expression | required failing tests (space separated)

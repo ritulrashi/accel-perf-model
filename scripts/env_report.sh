@@ -28,8 +28,10 @@ echo "  cmake: $(cmake --version | head -1)"
 echo "  ninja: $(ninja --version)"
 sc_ver=$(grep -hE '#define SC_VERSION_(MAJOR|MINOR|PATCH) ' "$SC_PREFIX/include/sysc/kernel/sc_ver.h" 2>/dev/null \
   | awk '{print $3}' | paste -sd. -)
-sc_date=$(grep -hE '#define SC_VERSION_RELEASE_DATE ' "$SC_PREFIX/include/sysc/kernel/sc_ver.h" 2>/dev/null \
-  | awk '{print $3}' | tr -d '"')
+# SC_VERSION_RELEASE_DATE is a two-line macro wrapping SYSTEMC_VERSION, so
+# read the number from SYSTEMC_VERSION itself (docs/BUGS.md #2).
+sc_date=$(grep -hE '#define SYSTEMC_VERSION ' "$SC_PREFIX/include/sysc/kernel/sc_ver.h" 2>/dev/null \
+  | awk '{print $3}')
 [ -n "${sc_date:-}" ] && sc_ver="$sc_ver (release date $sc_date)"
 echo "  systemc: ${sc_ver:-not found} at $SC_PREFIX, commit $(cat "$SC_PREFIX/PINNED_COMMIT" 2>/dev/null || echo unknown)"
 echo "  googletest: $(grep -oE 'GIT_TAG [0-9a-f]+ +# v[0-9.]+' CMakeLists.txt | sed 's/GIT_TAG //')"
