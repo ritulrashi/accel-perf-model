@@ -13,6 +13,10 @@ if(APM_SANITIZE)
   add_link_options(-fsanitize=address,undefined)
 endif()
 add_compile_options(-Wall -Wextra -Wpedantic -Werror)
+# Phase 4 design note §2.2: floating-point results must not depend on the
+# compiler fusing a*b + c into an FMA (GCC defaults to -ffp-contract=fast in
+# GNU mode). Applies to the model and to both standalone references.
+add_compile_options(-ffp-contract=off)
 
 # The installed package reports 3.0.2.<release date>, so EXACT 3.0.2 would
 # reject it; require the 3.0.2 prefix instead.
@@ -42,6 +46,10 @@ add_library(apm_core
   src/noc/mesh_timing.cpp
   src/soc/soc_plan.cpp
   src/soc/stall.cpp
+  src/compute/numerics.cpp
+  src/vec/softmax.cpp
+  src/vec/vu_plan.cpp
+  src/vec/vu_stall.cpp
 )
 target_include_directories(apm_core PUBLIC src)
 
@@ -58,6 +66,8 @@ add_library(apm_model
   src/noc/mesh.cpp
   src/soc/accel.cpp
   src/soc/accel_run.cpp
+  src/vec/vec_unit.cpp
+  src/vec/vu_run.cpp
 )
 target_link_libraries(apm_model PUBLIC apm_core SystemC::systemc)
 
@@ -67,8 +77,11 @@ add_executable(apm_gemm tools/apm_gemm.cpp)
 target_link_libraries(apm_gemm PRIVATE apm_model)
 add_executable(apm_accel tools/apm_accel.cpp)
 target_link_libraries(apm_accel PRIVATE apm_model)
-# Standalone functional reference: deliberately links nothing from the model.
+add_executable(apm_op tools/apm_op.cpp)
+target_link_libraries(apm_op PRIVATE apm_model)
+# Standalone functional references: deliberately link nothing from the model.
 add_executable(gemm_ref tools/gemm_ref.cpp)
+add_executable(attn_ref tools/attn_ref.cpp)
 
 enable_testing()
 include(GoogleTest)
@@ -82,6 +95,8 @@ add_executable(unit_tests
   tests/unit/mesh_timing_test.cpp
   tests/unit/stall_test.cpp
   tests/unit/soc_plan_test.cpp
+  tests/unit/numerics_test.cpp
+  tests/unit/softmax_test.cpp
 )
 target_link_libraries(unit_tests PRIVATE apm_core GTest::gtest_main)
 gtest_discover_tests(unit_tests TEST_PREFIX "unit." PROPERTIES LABELS unit)
@@ -89,7 +104,7 @@ gtest_discover_tests(unit_tests TEST_PREFIX "unit." PROPERTIES LABELS unit)
 # SystemC cannot be re-elaborated in one process. gtest_discover_tests runs
 # every test case in its own process, which is exactly what we need.
 add_executable(sim_tests tests/sim/main.cpp tests/sim/scenarios_test.cpp tests/sim/phase2_test.cpp
-  tests/sim/phase3_test.cpp)
+  tests/sim/phase3_test.cpp tests/sim/phase4_test.cpp)
 target_link_libraries(sim_tests PRIVATE apm_model GTest::gtest)
 gtest_discover_tests(sim_tests TEST_PREFIX "sim."
   PROPERTIES LABELS sim ENVIRONMENT "SYSTEMC_DISABLE_COPYRIGHT_MESSAGE=1")

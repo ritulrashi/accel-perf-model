@@ -9,6 +9,10 @@
 // nbuf, nout (2, 2), dram_w (16), t_hit (10), t_miss (30), dram_q (8),
 // hop (2), link (16), sram_banks (8), sram_bytes / lmem_bytes (0 = exactly
 // what the plan needs), gdma_m, pe_dma_m (8, 8).
+// Phase 4: prec (int8 | fp16 | bf16 | fp32, default int8), q (0 = e),
+// m_valid (0 = M), px_map, py_map (logical mapping, 0 = physical).
+// a/b files hold row-major e-byte elements of the precision; C is written as
+// 4-byte words (INT32, or FP32 bits).
 // Without a/b files the operands are pseudo-random from `seed` (default 1);
 // operand values never affect timing.
 #include <systemc>
@@ -27,13 +31,34 @@
 
 namespace {
 
-std::vector<std::int8_t> read_i8(const std::string& path, std::uint64_t n) {
+std::vector<std::uint8_t> read_bytes(const std::string& path, std::uint64_t n) {
   std::ifstream f(path, std::ios::binary);
   if (!f) throw std::runtime_error("cannot open " + path);
   std::vector<char> raw((std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>());
   if (raw.size() != n) throw std::runtime_error(path + ": expected " + std::to_string(n) + " bytes");
-  std::vector<std::int8_t> v(n);
+  std::vector<std::uint8_t> v(n);
   std::memcpy(v.data(), raw.data(), n);
+  return v;
+}
+
+// Pseudo-random operands of precision p: INT8 values, or floats in [-1, 1)
+// on a 1/128 grid (representable in every floating-point mode).
+std::vector<std::uint8_t> random_elems(apm::Precision p, std::uint64_t n, std::uint32_t seed) {
+  const unsigned e = apm::elem_bytes(p);
+  std::vector<std::uint8_t> v(n * e);
+  for (std::uint64_t i = 0; i < n; ++i) {
+    seed = seed * 1103515245u + 12345u;
+    const auto x = static_cast<std::int8_t>(seed >> 16);
+    if (p == apm::Precision::Int8) {
+      v[i] = static_cast<std::uint8_t>(x);
+      continue;
+    }
+    const float f = static_cast<float>(x) / 128.0f;
+    std::uint32_t w = p == apm::Precision::Fp16   ? apm::f32_to_fp16(f)
+                      : p == apm::Precision::Bf16 ? apm::f32_to_bf16(f)
+                                                  : apm::f32_to_bits(f);
+    for (unsigned b = 0; b < e; ++b) v[i * e + b] = static_cast<std::uint8_t>(w >> (8 * b));
+  }
   return v;
 }
 
@@ -81,6 +106,11 @@ int sc_main(int argc, char** argv) {
     g.hop = opt("hop", 2);
     g.link_bytes = u(opt("link", 16));
     g.sram.banks = u(opt("sram_banks", 8));
+    g.pe.prec = apm::parse_precision(kv.count("prec") ? kv.at("prec") : "int8");
+    g.pe.q = u(opt("q", 0));
+    g.px_map = u(opt("px_map", 0));
+    g.py_map = u(opt("py_map", 0));
+    run.m_valid = opt("m_valid", 0);
     run.cfg.dram.bus_bytes_per_cycle = u(opt("dram_w", 16));
     run.cfg.dram.t_hit = opt("t_hit", 10);
     run.cfg.dram.t_miss = opt("t_miss", 30);
@@ -98,13 +128,18 @@ int sc_main(int argc, char** argv) {
     }
 
     const std::uint64_t m = run.shape.m, n = run.shape.n, k = run.shape.k;
+    const unsigned e = apm::elem_bytes(g.pe.prec);
     if (kv.count("a")) {
-      run.a = read_i8(kv.at("a"), m * k);
-      run.b = read_i8(kv.at("b"), k * n);
-    } else {
+      run.a_bytes = read_bytes(kv.at("a"), m * k * e);
+      run.b_bytes = read_bytes(kv.at("b"), k * n * e);
+    } else if (g.pe.prec == apm::Precision::Int8) {  // Phase 3 operand stream, unchanged
       const auto seed = static_cast<std::uint32_t>(opt("seed", 1));
       run.a = lcg(m * k, seed);
       run.b = lcg(k * n, seed * 7919u + 1);
+    } else {
+      const auto seed = static_cast<std::uint32_t>(opt("seed", 1));
+      run.a_bytes = random_elems(g.pe.prec, m * k, seed);
+      run.b_bytes = random_elems(g.pe.prec, k * n, seed * 7919u + 1);
     }
 
     const apm::AccelRunResult r = apm::run_accel(run);

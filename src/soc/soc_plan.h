@@ -3,6 +3,12 @@
 // blocks, the shared-SRAM layout (staging ring + per-PE C slots) with its
 // capacity check, and the DRAM byte counts used by the stall-stack and
 // roofline cross-checks.
+//
+// Phase 4 (design note §5): tiles are mapped over a *logical* grid
+// px_map x py_map (product = P; default the physical shape). Logical PE
+// (x', y') has id x' * py_map + y' and sits at the physical node of that id,
+// so a 1 x P mapping spreads a single tile row over the whole grid. The
+// write-back of each tile covers only its valid rows (GemmLayout::m_valid).
 #pragma once
 #include <cstdint>
 #include <vector>
@@ -24,8 +30,11 @@ struct GridConfig {
   DmaParams gdma;              // global DMA (DRAM <-> SRAM)
   Cycle hop = 2;               // mesh hop latency
   unsigned link_bytes = 16;    // mesh link bandwidth
+  unsigned px_map = 0, py_map = 0;  // logical mapping shape; 0 = physical (px, py)
 
   unsigned pes() const { return px * py; }
+  unsigned map_x() const { return px_map ? px_map : px; }
+  unsigned map_y() const { return py_map ? py_map : py; }
   MeshParams mesh() const { return MeshParams{px, py, hop, link_bytes}; }
 };
 
@@ -44,7 +53,7 @@ struct ChunkSet {
 
 struct PeTile {
   std::uint64_t mi, nj, wave;
-  unsigned x, y;  // the PE
+  unsigned x, y;  // the PE's logical position
 };
 
 class SocPlan {
@@ -76,7 +85,7 @@ class SocPlan {
   bool full_waves() const;
   // Bytes the run must move to/from DRAM: every staged block plus C.
   std::uint64_t dram_bytes_exact() const;
-  // §2.2 closed form, valid for full waves: |A|*tiles_n/Py + |B|*tiles_m/Px + |C|.
+  // §2.2 closed form, valid for full waves: |A|*tiles_n/py_map + |B|*tiles_m/px_map + |C|.
   std::uint64_t dram_bytes_formula() const;
 
   const GemmLayout& layout() const { return l_; }

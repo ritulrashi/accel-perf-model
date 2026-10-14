@@ -11,14 +11,15 @@ PeBuffers plan_pe(const PeConfig& cfg, const GemmLayout& job) {
   job.validate();
   if (job.array.rows != cfg.array.rows || job.array.cols != cfg.array.cols || job.kt != cfg.kt)
     throw std::invalid_argument("PE: GEMM layout does not match the PE's array/Kt");
+  if (job.prec != cfg.prec) throw std::invalid_argument("PE: GEMM layout precision differs from the PE's");
   return plan_pe_buffers(cfg);
 }
 
 PeBuffers plan_pe_buffers(const PeConfig& cfg) {
   if (cfg.array.rows == 0 || cfg.array.cols == 0 || cfg.kt == 0)
     throw std::invalid_argument("PE: empty array or chunk");
-  const std::uint64_t a_sz = std::uint64_t{cfg.array.rows} * cfg.kt;
-  const std::uint64_t b_sz = cfg.kt * cfg.array.cols;
+  const std::uint64_t a_sz = cfg.a_block_bytes();
+  const std::uint64_t b_sz = cfg.b_block_bytes();
   const std::uint64_t c_sz = 4ull * cfg.array.rows * cfg.array.cols;
   if (cfg.n_buf == 0 || cfg.n_out == 0) throw std::invalid_argument("PE: n_buf and n_out must be >= 1");
   cfg.lmem.validate();

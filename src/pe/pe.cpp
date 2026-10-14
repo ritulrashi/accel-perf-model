@@ -12,7 +12,7 @@ Pe::Pe(sc_core::sc_module_name name, const PeConfig& cfg, PeJob& job)
       dma("dma", cfg.dma),
       cfg_(cfg),
       job_(job),
-      acc_(cfg.array) {
+      acc_(cfg.array, cfg.prec) {
   // Both LMEM capacity-check layers (Phase 2 §2.4) happen in plan_pe_buffers().
   const PeBuffers bufs = plan_pe_buffers(cfg);
   a_buf_ = bufs.a;
@@ -34,13 +34,13 @@ bool Pe::operand_buffer_free(std::uint64_t step, Cycle now) const {
   if (step < cfg_.n_buf) return true;
   const std::int64_t f = steps_[step - cfg_.n_buf].feed;
   // A buffer is free once its chunk's feed has ended (Phase 2 §2.3 rule 2).
-  return f >= 0 && static_cast<Cycle>(f) + cfg_.kt <= now;
+  return f >= 0 && static_cast<Cycle>(f) + cfg_.feed_cycles() <= now;
 }
 
 void Pe::issue_loads(std::uint64_t step, Cycle now) {
   const unsigned buf = static_cast<unsigned>(step % cfg_.n_buf);
-  const std::uint64_t a_sz = std::uint64_t{cfg_.array.rows} * cfg_.kt;
-  const std::uint64_t b_sz = cfg_.kt * cfg_.array.cols;
+  const std::uint64_t a_sz = cfg_.a_block_bytes();
+  const std::uint64_t b_sz = cfg_.b_block_bytes();
   StepRec& r = steps_[step];
   r.loads_submit = static_cast<std::int64_t>(now);
   r.a_desc = dma.submit({DmaDir::DramToSram, job_.a_src(step), a_buf_[buf], 1, a_sz, a_sz, a_sz});
@@ -62,20 +62,20 @@ void Pe::try_feed(Cycle now) {
     cur_tile_ = t;
   }
   steps_[s].feed = static_cast<std::int64_t>(now);
-  feeding_until_ = now + cfg_.kt;
+  feeding_until_ = now + cfg_.feed_cycles();
   ++next_feed_;
 
   // Functional data path: the whole chunk is applied at feed start. The
   // operands cannot change before feed end because their buffer is not
   // reloaded until then.
   const unsigned buf = static_cast<unsigned>(s % cfg_.n_buf);
-  std::vector<std::int8_t> a(std::uint64_t{cfg_.array.rows} * cfg_.kt), b(cfg_.kt * cfg_.array.cols);
-  lmem.peek(a_buf_[buf], reinterpret_cast<std::uint8_t*>(a.data()), a.size());
-  lmem.peek(b_buf_[buf], reinterpret_cast<std::uint8_t*>(b.data()), b.size());
-  acc_.accumulate(a.data(), b.data(), cfg_.kt);
+  std::vector<std::uint8_t> a(cfg_.a_block_bytes()), b(cfg_.b_block_bytes());
+  lmem.peek(a_buf_[buf], a.data(), a.size());
+  lmem.peek(b_buf_[buf], b.data(), b.size());
+  acc_.accumulate_bytes(a.data(), b.data(), cfg_.kt);
 
   if (c + 1 == job_.chunks()) {  // last chunk: the drain follows (Phase 2 §2.2)
-    tile_done_at_ = tile_done(cfg_.array, now, cfg_.kt);
+    tile_done_at_ = tile_done(cfg_.array, now, cfg_.feed_cycles());
     drain_pending_ = true;
   }
 }
@@ -83,10 +83,8 @@ void Pe::try_feed(Cycle now) {
 void Pe::finish_tile(Cycle now) {
   const std::uint64_t t = cur_tile_;
   const std::uint64_t out = out_buf_[t % cfg_.n_out];
-  const auto& v = acc_.values();
-  // The drain writes INT32 results (little-endian, host order) into the output buffer.
-  std::vector<std::uint8_t> bytes(v.size() * 4);
-  std::memcpy(bytes.data(), v.data(), bytes.size());
+  // The drain writes INT32 / FP32 results (little-endian, host order) into the output buffer.
+  const std::vector<std::uint8_t> bytes = acc_.bytes();
   lmem.poke(out, bytes.data(), bytes.size());
   tile_in_array_ = false;
   drain_pending_ = false;

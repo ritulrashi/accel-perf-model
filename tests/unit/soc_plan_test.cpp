@@ -91,3 +91,62 @@ TEST(SocPlan, SramNodeMustBeInTheGrid) {
   g.sram_node = {2, 0};
   EXPECT_THROW(SocPlan(g, gemm(16, 64, 128)), std::invalid_argument);
 }
+
+// Phase 4 §5.2: logical 1x4 mapping on a 2x2 grid, one tile row of 8 tiles.
+// PE ids 0-3 take tiles (0, 0..3) in wave 0 and (0, 4..7) in wave 1, and sit
+// at physical nodes (0,0), (0,1), (1,0), (1,1).
+TEST(SocPlan, LogicalMapping1x4) {
+  GridConfig g = grid(2, 2, 1 << 16);
+  g.px_map = 1;
+  g.py_map = 4;
+  const SocPlan p(g, gemm(4, 128, 64));
+  EXPECT_EQ(p.waves(), 2u);
+  for (unsigned pe = 0; pe < 4; ++pe) {
+    const auto& t = p.tiles_of(pe);
+    ASSERT_EQ(t.size(), 2u);
+    EXPECT_EQ(t[0].mi, 0u);
+    EXPECT_EQ(t[0].nj, pe);
+    EXPECT_EQ(t[1].nj, pe + 4);
+    EXPECT_EQ(p.node(pe).x, pe / 2);
+    EXPECT_EQ(p.node(pe).y, pe % 2);
+  }
+  // A: one 256 B block per wave (2); B: 8 blocks of 1024 B; C: 4 x 128 x 4.
+  EXPECT_EQ(p.dram_bytes_exact(), 512u + 8192u + 2048u);
+  EXPECT_EQ(p.dram_bytes_formula(), 512u + 8192u + 2048u);
+  g.py_map = 3;  // 1 x 3 does not cover 4 PEs
+  EXPECT_THROW(SocPlan(g, gemm(4, 128, 64)), std::invalid_argument);
+}
+
+// Physical mapping of the same GEMM leaves PEs (1,0) and (1,1) without work.
+TEST(SocPlan, PhysicalMappingOfOneTileRow) {
+  const SocPlan p(grid(2, 2, 1 << 16), gemm(4, 128, 64));
+  EXPECT_EQ(p.tiles_of(0).size(), 4u);
+  EXPECT_EQ(p.tiles_of(1).size(), 4u);
+  EXPECT_EQ(p.tiles_of(2).size(), 0u);
+  EXPECT_EQ(p.tiles_of(3).size(), 0u);
+}
+
+// Phase 4 §5.1: m_valid = 1 of M = 4: the write-back moves one row; C bytes count valid rows.
+TEST(SocPlan, MaskedWriteBack) {
+  GemmLayout l = gemm(4, 16, 64);
+  l.m_valid = 1;
+  const SocPlan p(grid(1, 1, 1 << 16), l);
+  EXPECT_EQ(p.writeback(0, 0).rows, 1u);
+  EXPECT_EQ(p.dram_bytes_exact(), 256u + 1024u + 64u);  // P4-T4
+  l.m_valid = 0;
+  EXPECT_EQ(SocPlan(grid(1, 1, 1 << 16), l).writeback(0, 0).rows, 4u);
+  GemmLayout bad = gemm(8, 16, 64);
+  bad.m_valid = 4;  // a whole tile row of padding
+  EXPECT_THROW(bad.validate(), std::invalid_argument);
+}
+
+// Phase 4 §1.3: e-byte blocks in the staging plan (P4-T1 / P4-T2 DRAM bytes).
+TEST(SocPlan, PrecisionScalesBlocks) {
+  for (auto [prec, bytes] : {std::pair{apm::Precision::Fp16, 2816u}, std::pair{apm::Precision::Fp32, 5376u}}) {
+    GridConfig g = grid(1, 1, 1 << 16);
+    g.pe.prec = prec;
+    GemmLayout l = gemm(4, 16, 64);
+    l.prec = prec;
+    EXPECT_EQ(SocPlan(g, l).dram_bytes_exact(), bytes);
+  }
+}

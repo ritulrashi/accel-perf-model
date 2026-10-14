@@ -123,3 +123,14 @@ TEST(PeConfig, P2T7_CapacityBoundary) {
 TEST(PeConfig, RejectsMismatchedJob) {
   EXPECT_THROW(apm::plan_pe(p2_config(1 << 14), layout(4, 16, 64, 4, 16, 32)), std::invalid_argument);
 }
+
+// Phase 4 §7: LMEM for P4-T2 (FP32, 4x16 array, Kt = 64) is exactly 2 x (1024 + 4096) + 2 x 256.
+TEST(PeConfig, P4Fp32CapacityBoundary) {
+  PeConfig c = p2_config(10752);
+  c.prec = apm::Precision::Fp32;
+  EXPECT_EQ(c.lmem_required(), 10752u);
+  EXPECT_EQ(c.feed_cycles(), 256u);
+  EXPECT_NO_THROW(apm::plan_pe_buffers(c));
+  c.lmem.capacity_bytes = 10751;
+  EXPECT_THROW(apm::plan_pe_buffers(c), std::invalid_argument);
+}

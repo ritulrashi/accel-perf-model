@@ -52,8 +52,9 @@ class DramGemmJob : public PeJob {
   }
   TileDesc store(std::uint64_t t, std::uint64_t lmem_src) const override {
     const std::uint64_t row = 4ull * l_.array.cols;
-    return {DmaDir::SramToDram, lmem_src, l_.c_tile_addr(t / l_.tiles_n(), t % l_.tiles_n()),
-            l_.array.rows, row, row, 4 * l_.shape.n};
+    const std::uint64_t mi = t / l_.tiles_n();
+    return {DmaDir::SramToDram, lmem_src, l_.c_tile_addr(mi, t % l_.tiles_n()),
+            static_cast<std::uint32_t>(l_.tile_valid_rows(mi)), row, row, 4 * l_.shape.n};
   }
 
  private:

@@ -680,3 +680,17 @@ tests/unit/numerics_test.cpp, softmax_test.cpp, vu_plan_test.cpp (+ soc_plan_tes
 tests/sim/phase4_test.cpp      P4-T1..T4, P4-V1..V2
 scripts/phase4_exit.sh, phase4_mutation_check.sh, phase4_results.sh
 ```
+
+## 13. Implementation notes (added while building; nothing above changed)
+
+1. **`vu_exp` accuracy bound (§7 unit case).** The note's "relative error
+   ≤ 4e-7 on [−87, 0]" ignored the rounding of the reduced argument
+   `t = fl32(x·LOG2E)`. Its relative error (≤ 2^−23, from the product and
+   from LOG2E itself) becomes an absolute error of up to `|t|·2^−23` in the
+   exponent, so the relative error of the result grows by about
+   `ln2·|t|·2^−23 ≈ 8.3e-8·|t|`. I caught this while writing the test,
+   before running anything. The test therefore checks
+   `≤ 6e-7 + 1e-7·|t|` over [−86, 0], and the original 4e-7 only for
+   |t| ≤ 1, where the polynomial dominates. In softmax, `x = (s − m)·α`
+   is small for the entries that carry weight. The numerics results (H7)
+   measure the end-to-end effect.

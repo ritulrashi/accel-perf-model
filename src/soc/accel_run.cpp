@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <cstring>
+#include <functional>
 #include <memory>
 #include <sstream>
 #include <stdexcept>
@@ -36,6 +37,8 @@ GemmLayout accel_layout(const AccelRun& run) {
   l.shape = run.shape;
   l.array = run.cfg.grid.pe.array;
   l.kt = run.cfg.grid.pe.kt;
+  l.prec = run.cfg.grid.pe.prec;
+  l.m_valid = run.m_valid;
   const std::uint64_t row = run.cfg.dram.row_bytes;
   l.a_base = 0;
   l.b_base = round_up(l.a_packed_bytes(), row);
@@ -43,19 +46,20 @@ GemmLayout accel_layout(const AccelRun& run) {
   return l;
 }
 
-AccelRunResult run_accel(AccelRun run) {
+namespace {
+
+// Builds the accelerator, preloads DRAM, runs to completion and computes the
+// stall stack with every §3.3 assertion. `image_bytes` > 0: read back that
+// many bytes of DRAM into the result's image.
+AccelRunResult simulate(AccelConfig cfg, const GemmLayout& l,
+                        const std::function<void(DramChannel&)>& preload, std::uint64_t image_bytes) {
   claim_simulation();
   check_time_resolution();
-  const GemmLayout l = accel_layout(run);
   // All configuration errors surface here, before any module is built.
-  const SocPlan plan(run.cfg.grid, l);
-  run.cfg.dram.capacity_bytes =
-      std::max(run.cfg.dram.capacity_bytes, round_up(l.c_base + l.c_bytes(), run.cfg.dram.row_bytes));
+  const SocPlan plan(cfg.grid, l);
 
-  auto top = std::make_unique<Accel>("top", run.cfg, plan);
-  const auto pa = l.pack_a(run.a), pb = l.pack_b(run.b);
-  top->dram.poke(l.a_base, pa.data(), pa.size());
-  top->dram.poke(l.b_base, pb.data(), pb.size());
+  auto top = std::make_unique<Accel>("top", cfg, plan);
+  preload(top->dram);
 
   sc_core::sc_start(sc_core::sc_time::from_value(kMaxCycles * kPsPerCycle), sc_core::SC_EXIT_ON_STARVATION);
   require(!sc_core::sc_pending_activity(), "accelerator run did not finish within kMaxCycles");
@@ -67,13 +71,13 @@ AccelRunResult run_accel(AccelRun run) {
   r.t_end = top->sched.t_end();
 
   // ---- stall stack
-  const GridConfig& g = run.cfg.grid;
+  const GridConfig& g = cfg.grid;
   const Cycle fd = fill_drain(g.pe.array);
   for (unsigned p = 0; p < plan.pes(); ++p) {
     const Pe& pe = *top->pes[p];
     const GridJob& job = *top->jobs[p];
     PeTrace t;
-    t.kt = g.pe.kt;
+    t.kt = g.pe.feed_cycles();  // the classifier's "feed length" (q*Kt)
     t.fill_drain = fd;
     t.chunks = plan.chunks();
     t.n_out = g.pe.n_out;
@@ -107,10 +111,11 @@ AccelRunResult run_accel(AccelRun run) {
     }
     check(sum == r.t_end, "PE " + std::to_string(p) + ": categories sum to " + std::to_string(sum) +
                               ", T_end is " + std::to_string(r.t_end));
-    const std::uint64_t compute_formula = plan.tiles_of(p).size() * (plan.chunks() * g.pe.kt + fd);
+    const std::uint64_t compute_formula =
+        plan.tiles_of(p).size() * (plan.chunks() * g.pe.feed_cycles() + fd);
     check(n[static_cast<std::size_t>(StallCat::Compute)] == compute_formula,
           "PE " + std::to_string(p) + ": compute " +
-              std::to_string(n[static_cast<std::size_t>(StallCat::Compute)]) + " != tiles*(nc*Kt+F) = " +
+              std::to_string(n[static_cast<std::size_t>(StallCat::Compute)]) + " != tiles*(nc*q*Kt+F) = " +
               std::to_string(compute_formula));
     r.stalls.push_back(n);
   }
@@ -132,6 +137,9 @@ AccelRunResult run_accel(AccelRun run) {
   r.values["t_end"] = r.t_end;
   r.values["pes"] = plan.pes();
   r.values["ops"] = 2 * l.shape.m * l.shape.n * l.shape.k;
+  r.values["useful_ops"] = 2 * l.valid_rows() * l.shape.n * l.shape.k;
+  r.values["q"] = g.pe.cycles_per_step();
+  r.values["elem_bytes"] = l.elem();
   r.values["dram_bytes"] = dram_bytes;
   r.values["full_waves"] = plan.full_waves() ? 1 : 0;
   for (std::size_t k = 0; k < kStallCats; ++k) {
@@ -143,9 +151,46 @@ AccelRunResult run_accel(AccelRun run) {
 
   std::vector<std::uint8_t> raw(l.c_bytes());
   top->dram.peek(l.c_base, raw.data(), raw.size());
-  r.c.resize(l.shape.m * l.shape.n);
+  r.c.resize(l.valid_rows() * l.shape.n);
   std::memcpy(r.c.data(), raw.data(), raw.size());
+  if (image_bytes) {
+    r.image.resize(image_bytes);
+    top->dram.peek(0, r.image.data(), image_bytes);
+  }
   return r;
+}
+
+}  // namespace
+
+AccelRunResult run_accel(AccelRun run) {
+  const GemmLayout l = accel_layout(run);
+  l.validate();
+  run.cfg.dram.capacity_bytes =
+      std::max(run.cfg.dram.capacity_bytes, round_up(l.c_base + l.c_bytes(), run.cfg.dram.row_bytes));
+  std::vector<std::uint8_t> pa, pb;
+  if (!run.a_bytes.empty() || !run.b_bytes.empty()) {
+    pa = l.pack_a_bytes(run.a_bytes);
+    pb = l.pack_b_bytes(run.b_bytes);
+  } else {
+    if (l.prec != Precision::Int8) throw std::invalid_argument("run_accel: non-INT8 runs need a_bytes/b_bytes");
+    pa = l.pack_a(run.a);
+    pb = l.pack_b(run.b);
+  }
+  return simulate(run.cfg, l, [&](DramChannel& d) {
+    d.poke(l.a_base, pa.data(), pa.size());
+    d.poke(l.b_base, pb.data(), pb.size());
+  }, 0);
+}
+
+AccelRunResult run_accel_image(AccelConfig cfg, const GemmLayout& l, std::vector<std::uint8_t> image) {
+  l.validate();
+  if (l.a_base + l.a_packed_bytes() > image.size() || l.b_base + l.b_packed_bytes() > image.size() ||
+      l.c_base + l.c_bytes() > image.size())
+    throw std::invalid_argument("run_accel_image: a GEMM region lies outside the DRAM image");
+  if (image.size() % cfg.dram.row_bytes != 0)
+    throw std::invalid_argument("run_accel_image: image size must be a multiple of the DRAM row");
+  cfg.dram.capacity_bytes = image.size();
+  return simulate(cfg, l, [&](DramChannel& d) { d.poke(0, image.data(), image.size()); }, image.size());
 }
 
 std::string AccelRunResult::json() const {

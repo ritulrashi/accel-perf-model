@@ -18,11 +18,21 @@ struct PeConfig {
   unsigned n_out = 2;  // output (C tile) buffers
   SramParams lmem;
   DmaParams dma;
+  // Phase 4 (design note §1): operand precision and cycles per reduction
+  // step (0 = the mode's default, q = e).
+  Precision prec = Precision::Int8;
+  unsigned q = 0;
 
-  // Bytes of LMEM the buffers need (§2.4a).
+  unsigned elem() const { return elem_bytes(prec); }
+  unsigned cycles_per_step() const { return q ? q : default_q(prec); }
+  // Feed length of one chunk: q*Kt (Kt for INT8).
+  Cycle feed_cycles() const { return cycles_per_step() * kt; }
+  std::uint64_t a_block_bytes() const { return std::uint64_t{array.rows} * kt * elem(); }
+  std::uint64_t b_block_bytes() const { return kt * array.cols * elem(); }
+
+  // Bytes of LMEM the buffers need (§2.4a; Phase 4 §1.3 with e-byte operands).
   std::uint64_t lmem_required() const {
-    return n_buf * (std::uint64_t{array.rows} * kt + kt * array.cols) +
-           n_out * 4ull * array.rows * array.cols;
+    return n_buf * (a_block_bytes() + b_block_bytes()) + n_out * 4ull * array.rows * array.cols;
   }
 };
 
