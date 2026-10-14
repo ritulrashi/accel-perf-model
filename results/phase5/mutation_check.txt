@@ -1,0 +1,111 @@
+# Phase 5 mutation check: do the tests, stall-stack assertions and functional checks detect injected bugs?
+command: scripts/phase5_mutation_check.sh
+
+## Provenance (of the unmutated tree the mutants were derived from)
+date_utc: 2026-10-14T21:22:53Z
+commit: 052a61f513197f1c7351aa8ee66cb9771876b67b
+tree: clean
+host: Linux 6.8.0-1064-azure x86_64
+os: Ubuntu 24.04.3 LTS
+lscpu:
+  Architecture:                            x86_64
+  CPU(s):                                  2
+  Model name:                              AMD EPYC 7763 64-Core Processor
+  Thread(s) per core:                      2
+  Core(s) per socket:                      1
+  Socket(s):                               1
+  L1d cache:                               32 KiB (1 instance)
+  L1i cache:                               32 KiB (1 instance)
+  L2 cache:                                512 KiB (1 instance)
+  L3 cache:                                32 MiB (1 instance)
+mem_total: 8132888 kB
+tools:
+  c++: c++ (Ubuntu 13.3.0-6ubuntu2~24.04) 13.3.0
+  cmake: cmake version 3.28.3
+  ninja: 1.11.1
+  systemc: 3.0.2 (release date 20251031) at /opt/systemc-3.0.2, commit 70b0fc8e4a74acc677b0fc73cea08f940c2115d5
+  googletest: 52eb8108c5bdec04579160ae17225d66034bd723  # v1.17.0
+  python3: Python 3.12.3
+  numpy: 1.26.4
+  verilator: Verilator 5.020 2024-01-01 rev (Debian 5.020-1)
+
+## Baseline (unmutated copy)
+ctest: tests passed, 0 tests failed out of 128
+failing tests: none
+
+## R1 (rtl/os_array.sv)
+55:      assign west[i] = {in_valid, in_first, in_last, in_k, a_col[i]};  // MUTANT R1 row skew missing
+failing tests (3):
+  rtl.correlate_quick
+  rtl.ht1
+  rtl.ht2
+required: rtl.ht1 rtl.ht2 rtl.correlate_quick
+verdict: CAUGHT
+
+## R2 (rtl/os_array.sv)
+123:  assign drain_row   = RW'(DW'(R) - drain_left);  // MUTANT R2 row 0 first
+failing tests (3):
+  rtl.correlate_quick
+  rtl.ht1
+  rtl.ht2
+required: rtl.ht1 rtl.ht2 rtl.correlate_quick
+verdict: CAUGHT
+
+## R3 (rtl/os_cell.sv)
+50:      if (v_in) acc <= acc + prod;  // MUTANT R3 no clear on first
+failing tests (1):
+  rtl.correlate_quick
+required: rtl.correlate_quick
+verdict: CAUGHT
+
+## R4 (rtl/os_array.sv)
+121:  assign corner_last = v_i[R-1][C] && l_i[R-1][C];  // MUTANT R4 drain one cycle late
+failing tests (3):
+  rtl.correlate_quick
+  rtl.ht1
+  rtl.ht2
+required: rtl.ht1 rtl.ht2 rtl.correlate_quick
+verdict: CAUGHT
+
+## R5 (src/compute/contract_trace.cpp)
+39:          std::int64_t& slot = at(mac_cycle(st.feed, i, 0, k))  /* MUTANT R5 contract drops j */.ks[std::size_t{i} * s.cols + j];
+failing tests (5):
+  rtl.correlate_quick
+  rtl.ht1
+  rtl.ht2
+  unit.ContractTrace.HT1MatchesHandTrace
+  unit.ContractTrace.HT2MatchesHandTrace
+required: unit.ContractTrace.HT1MatchesHandTrace unit.ContractTrace.HT2MatchesHandTrace rtl.ht1 rtl.correlate_quick
+verdict: CAUGHT
+
+## R6 (tb/os_array_tb.cpp)
+122:      for (unsigned j = 0; j < s.cols; ++j) m.b_row[j] = st.b[(k == 0 ? 0 : k - 1) * s.cols + j];  // MUTANT R6 testbench B row late
+failing tests (3):
+  rtl.correlate_quick
+  rtl.ht1
+  rtl.ht2
+required: rtl.ht1 rtl.ht2 rtl.correlate_quick
+verdict: CAUGHT
+
+## X1 (src/mem/dram_timing.cpp)
+33:  const std::uint64_t bank = row_index % p_.banks;  // MUTANT X1 xor map ignored
+failing tests (4):
+  sim.Phase5.T5a_XorMapSplitsT4c
+  sim.Phase5.T5b_XorMapPermutesConflicts
+  sim.Phase5.T5d_StrideOfFourRowsXorMap
+  unit.DramTiming.XorMapHandRowsAndBijection
+required: sim.Phase5.T5a_XorMapSplitsT4c sim.Phase5.T5d_StrideOfFourRowsXorMap unit.DramTiming.XorMapHandRowsAndBijection
+verdict: CAUGHT
+
+## X2 (src/mem/dram_timing.cpp)
+33:  const std::uint64_t bank = p_.bank_map == BankMap::Xor ? (row_index ^ (row_index / (2 * p_.banks))) % p_.banks /* MUTANT X2 wrong xor term */ : row_index % p_.banks;
+failing tests (4):
+  sim.Phase5.T5a_XorMapSplitsT4c
+  sim.Phase5.T5b_XorMapPermutesConflicts
+  sim.Phase5.T5d_StrideOfFourRowsXorMap
+  unit.DramTiming.XorMapHandRowsAndBijection
+required: unit.DramTiming.XorMapHandRowsAndBijection sim.Phase5.T5d_StrideOfFourRowsXorMap
+verdict: CAUGHT
+
+## Result
+all mutants caught by their required tests: yes

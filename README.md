@@ -18,10 +18,10 @@ configurable modelling parameter, not a datasheet value. See
 | 2 | Compute unit, double buffering, functional reference | [docs/phase2-design.md](docs/phase2-design.md) | done: [exit criterion](results/phase2/exit_criterion.txt), [functional cases](results/phase2/functional.csv), [mutation check](results/phase2/mutation_check.txt) |
 | 3 | Accelerator top, stall stack, roofline | [docs/phase3-design.md](docs/phase3-design.md) | done: [exit criterion](results/phase3/exit_criterion.txt), [sweep](results/phase3/sweep.csv), [roofline](results/phase3/roofline.png), [mutation check](results/phase3/mutation_check.txt), [hypotheses](RESULTS.md) |
 | 4 | Attention / GenAI workloads, precision modes, vector unit | [docs/phase4-design.md](docs/phase4-design.md) | done: [exit criterion](results/phase4/exit_criterion.txt), [study](results/phase4/study.csv), [GEMM](results/phase4/functional_gemm.csv) and [attention](results/phase4/functional_attn.csv) functional cases, [mutation check](results/phase4/mutation_check.txt), [hypotheses](RESULTS.md) |
-| 5 | Microarchitecture sweeps, SystemVerilog correlation | — | not started |
+| 5 | SystemVerilog correlation of the compute array, DRAM bank map, microarchitecture sweeps | [docs/phase5-design.md](docs/phase5-design.md) | done: [exit criterion](results/phase5/exit_criterion.txt), [correlation](results/phase5/correlation.csv) and [log](docs/CORRELATION.md), [sweeps](results/phase5/sweep.csv), [mutation check](results/phase5/mutation_check.txt), [hypotheses](RESULTS.md) |
 | 6 | Automation and CI | — | not started |
 
-## Architecture (through Phase 4)
+## Architecture (through Phase 5)
 
 ```
                  ┌──────────────────────── PE ───────────────────────────┐
@@ -67,6 +67,16 @@ configurable modelling parameter, not a datasheet value. See
     (grouped-query, KV cache) attention into a Q·Kᵀ → softmax → P·V program.
     Each op runs on the model as its own simulation, with the DRAM image
     handed along. See [docs/phase4-design.md](docs/phase4-design.md).
+- **RTL correlation and sweeps (Phase 5):**
+  - **RTL:** `rtl/os_array.sv` is a SystemVerilog output-stationary INT8
+    array that implements the Phase 2 cycle contract.
+  - **Testbench:** a Verilator testbench (`tb/`) replays the feed schedules
+    the model's PEs actually ran. It requires the RTL to match the model on
+    tile timing, drained values, and the MAC every cell performs in every
+    cycle. Two hand-written traces referee both sides.
+  - **DRAM:** an optional XOR bank-address map.
+  - **Sweeps:** the bank map, and equal-MAC grid arrangements. See
+    [docs/phase5-design.md](docs/phase5-design.md).
 
 ```
  DRAM ─ global DMA ─ shared SRAM @ router sram_node ─┬─ mesh ─ PE(0,0) … PE(Px-1,Py-1)
@@ -97,7 +107,14 @@ build/release/apm_accel M=16 N=64 K=128 R=4 C=16 Kt=64 px=2 py=2 prec=fp16 seed=
 python3 python/attn.py --mode decode --T 4096 --g 8 --prec int8 --p-scale row --tools build/release --check
 python3 python/attn_check.py --tools build/release --cases 80          # random programs, model vs NumPy vs attn_ref
 python3 python/study_p4.py --tools build/release --out-dir /tmp/study  # the 54-program study
+# Phase 5: one schedule through the RTL (three-level compare), the full correlation set, the sweeps
+build/release/os_array_tb tests/rtl/ht2.sched --expect-trace tests/rtl/ht2.trace
+python3 python/correlate.py --tools build/release
+python3 python/sweep_p5.py --tools build/release --out-dir /tmp/sweep5
 ```
+
+Building the RTL testbench needs Verilator (installed by `.devcontainer/setup.sh`);
+configure with `-DAPM_RTL=OFF` to skip it.
 
 ## Reproducing results
 
@@ -115,6 +132,9 @@ python3 python/study_p4.py --tools build/release --out-dir /tmp/study  # the 54-
 | All Phase 4 results, each on a clean tree | `scripts/phase4_results.sh` | the files below |
 | Phase 4 exit criterion: hand-derived precision and VU tests, 200 GEMMs by precision, 80 attention programs, 54-program study | `scripts/phase4_exit.sh` | `results/phase4/exit_criterion.txt`, `functional_gemm.csv`, `functional_attn.csv`, `study.csv`, `attention_breakdown.png`, `numerics.png`, `attention_roofline.png` |
 | Phase 4 mutation check | `scripts/phase4_mutation_check.sh` | `results/phase4/mutation_check.txt` |
+| All Phase 5 results, each on a clean tree | `scripts/phase5_results.sh` | the files below |
+| Phase 5 exit criterion: RTL lint, hand traces, full correlation, bank-map tests, sweeps S1/S2 | `scripts/phase5_exit.sh` | `results/phase5/exit_criterion.txt`, `correlation.csv`, `sweep.csv`, `bank_map.png`, `arrangements.png` |
+| Phase 5 mutation check | `scripts/phase5_mutation_check.sh` | `results/phase5/mutation_check.txt` |
 | Every number in RESULTS.md | `scripts/check_results.sh` | pass/fail |
 
 Every results file starts with a provenance block (`scripts/env_report.sh`):
@@ -126,6 +146,8 @@ commit, clean/dirty tree, machine, and tool versions.
 - [docs/phase2-design.md](docs/phase2-design.md): Phase 2 design note
 - [docs/phase3-design.md](docs/phase3-design.md): Phase 3 design note
 - [docs/phase4-design.md](docs/phase4-design.md): Phase 4 design note
+- [docs/phase5-design.md](docs/phase5-design.md): Phase 5 design note
+- [docs/CORRELATION.md](docs/CORRELATION.md): RTL vs model correlation method and deviation log
 - [RESULTS.md](RESULTS.md): measured results and hypothesis verdicts
 - [docs/BUGS.md](docs/BUGS.md): every bug found, and how it was detected
 - [docs/LIMITATIONS.md](docs/LIMITATIONS.md): what is not modelled

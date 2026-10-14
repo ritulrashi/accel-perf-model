@@ -283,3 +283,106 @@ Kt·e-byte segments with an R·Kt·e stride, interleaved with the S row loads.
 - **INT8-fixed error of exactly 1.0000e+00** is not a failed run: the model,
   the NumPy replica and the C++ reference all produce an all-zero O, bit
   for bit.
+
+## Phase 5: RTL correlation, DRAM bank map, microarchitecture sweeps
+
+Measured at commit 052a61f by `scripts/phase5_results.sh`. Sources:
+[exit_criterion.txt](results/phase5/exit_criterion.txt),
+[correlation.csv](results/phase5/correlation.csv),
+[sweep.csv](results/phase5/sweep.csv),
+[mutation_check.txt](results/phase5/mutation_check.txt). The method and
+deviation log are in [docs/CORRELATION.md](docs/CORRELATION.md).
+
+### Directed tests (hand-derived in the design note before running)
+
+| Test | Hand-derived | Measured |
+|---|---|---|
+| T5a, xor map splits T4c's conflict: responses | 34, 38 | 34, 38 |
+| T5b, xor map moves a conflict: responses | 34, 58 | 34, 58 |
+| T5c, four writes four DRAM rows apart, row map: last response | 106 | 106 |
+| T5d, same, xor map: last response | 46 | 46 |
+| HT1 / HT2: RTL and contract trace vs hand trace | identical | identical |
+
+Both presets pass all 128 tests. That includes RTL lint with `-Wall` and no
+waivers, at three shapes, and every Phase 1–4 test, unchanged. All 8
+mutants are caught: six on the RTL side, two in the bank map.
+
+### Hypotheses (written in the design note §11 before measuring)
+
+**H1: every schedule matches at all three levels on the first run.**
+**Confirmed.** 312 of 312 schedules match: 455 PE schedules, 2131 tiles,
+26336028 MACs, 774826 cycles. The RTL also reproduces both hand-written
+traces, and the Phase 2 directed schedules reproduce the Phase 2
+hand-derived tile-done cycles. No deviation was found at any point.
+
+**H2: the xor bank map makes prefill L = 1024 INT8 Q·Kᵀ ≥ 3× faster and
+the program ≥ 2× faster.** **Confirmed:**
+- Q·Kᵀ: 1402154 → 444441 cycles, 3.1549×;
+- program: 1700845 → 759529 cycles, 2.2393×.
+
+The row misses do not go away (FP16 Q·Kᵀ: 73760 with the row map, 73847
+with xor). They now overlap across banks instead of queueing on one, and
+the bus utilization of the INT8 op rises from 0.0935 to 0.2949.
+
+**H3: with the xor map, Phase 4's precision ranges hold (FP16/INT8 in
+[1.3, 1.8], FP32/FP16 in [1.4, 1.95]).** **Refuted.** Measured 1.1643 and
+1.3401; the bound-based values are 1.5214 and 1.6857. The bank map removes
+the serialization but not the misses. Q·Kᵀ is still far above its bound
+(FP16: 515988 cycles against 196608.0), and that cost does not scale with
+precision. The Phase 4 H2 prediction would need a controller that avoids
+the misses (row-buffer-aware reordering or a tile-major S layout), not one
+that only spreads them.
+
+**H4: decode T = 4096 changes ≤ ±10 % with the xor map, and GQA FP16
+T(16)/T(1) drops to ≤ 2.0.** **Partly refuted.**
+- **The decode half holds:** xor/row = 1.0290 (INT8), 1.0427 (FP16/BF16),
+  1.0404 (FP32), slightly slower.
+- **The GQA half fails:** T(16)/T(1) = 4.1445, against 4.4110 with the row
+  map. The Q·Kᵀ row misses are unchanged (4736 with either map) and the bus
+  stays mostly idle (0.1527).
+- **Why:** S rows there are 4·T bytes apart, which is 16 DRAM rows, i.e.
+  B² rows for B = 4 banks. A single xor fold (`row_index XOR row_index / B`)
+  spreads strides of B rows, but not strides of B². The design note's T5b
+  already showed that hashing permutes conflicts rather than removing them;
+  this is the same effect at a stride the hypothesis did not consider.
+
+**H5: equal-MAC prefill (L = 1024, FP16, xor): 4×4 of 8×8 slowest by
+≥ 1.5×; 1×1 of 32×32 and 2×2 of 16×16 within 15 %.** **Partly refuted.**
+
+| Arrangement | FP16 cycles | vs best | INT8 cycles | vs best |
+|---|---|---|---|---|
+| 1×1 of 32×32 | 710562 | 1.0000 | 568461 | 1.0000 |
+| 2×2 of 16×16 | 884328 | 1.2445 | 759529 | 1.3361 |
+| 4×4 of 8×8 | 1454917 | 2.0476 | 1142234 | 2.0093 |
+
+- **4×4 is slowest, as predicted:** its P·V op is network-bound (largest
+  stall category `network`).
+- **1×1 wins outright** instead of tying. Its 32-wide tiles write S in
+  rows twice as wide, so its Q·Kᵀ op takes 41394 row misses instead of
+  73847 (FP16) and is compute-bound (largest category `compute`, against
+  `dram` for 2×2).
+- Once again, the S write-back pattern, not the compute arrangement,
+  decides the ranking.
+
+**H6: equal-MAC decode (T = 4096, FP16, g = 1): 1×1 of 32×32 slowest by
+≥ 1.6×.** **Confirmed:** 49303 cycles against 28204 for 2×2, 1.7481×;
+4×4 sits in between at 1.2583.
+- **Contrast:** with INT8 and g = 8, the 1×1 array is the fastest (47686
+  cycles; 2×2 1.2840×, 4×4 2.1072×). Grouped heads fill its 32 rows'
+  worth of padding with useful work.
+
+![bank map](results/phase5/bank_map.png)
+![arrangements](results/phase5/arrangements.png)
+
+### What this phase changes in the story
+
+- **The RTL agrees with the model** on every cycle of every schedule tried.
+  So the compute-array timing that the Phase 2–4 results rest on is the
+  timing a hardware implementation of the contract produces.
+- **What limits this accelerator model is DRAM behaviour.** Phases 4 and 5
+  together show that it is not the arrays: the in-order controller turns
+  the S/P round trip of unfused attention into row-miss chains. A one-fold
+  bank hash fixes the stride it was designed for and nothing else.
+- **The next experiments that would move the numbers** are a row-buffer-
+  aware controller and fused attention (no S round trip). Neither is in
+  this project; both are listed in LIMITATIONS.

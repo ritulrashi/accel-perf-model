@@ -1,6 +1,6 @@
 # Phase 5 Design Note — RTL Correlation of the Compute Unit, Microarchitecture Sweeps
 
-Status: **approved 2026-10-14 (user: "go"); implementing**
+Status: **approved 2026-10-14 (user: "go"); implemented**
 
 ## 0. What Phase 5 adds
 
