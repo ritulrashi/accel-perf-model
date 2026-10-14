@@ -1,0 +1,18 @@
+{
+  "name": "accel-perf-model",
+  "image": "mcr.microsoft.com/devcontainers/base:ubuntu-24.04",
+  "hostRequirements": { "cpus": 2 },
+  "features": {
+    "ghcr.io/devcontainers/features/sshd:1": { "version": "latest" }
+  },
+  "postCreateCommand": "bash .devcontainer/setup.sh",
+  "remoteEnv": {
+    "SYSTEMC_HOME": "/opt/systemc-3.0.2",
+    "SYSTEMC_DISABLE_COPYRIGHT_MESSAGE": "1"
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": ["ms-vscode.cpptools", "ms-vscode.cmake-tools"]
+    }
+  }
+}
