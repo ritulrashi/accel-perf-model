@@ -266,11 +266,14 @@ def plot_errors(rows, path):
                     va="center")
     ax.set_xscale("log", base=2)
     ax.set_yscale("log")
+    ax.set_xticks(Ts)
+    ax.set_xticklabels([str(T) for T in Ts])
     ax.set_xlim(Ts[0] / 1.3, Ts[-1] * 3.5)
     ax.set_xlabel("decode KV-cache length T", color=INK2)
     ax.set_ylabel("relative Frobenius error of O vs FP64", color=INK2)
     ax.set_title("Decode numerics by precision (g=1, d=64, N(0,1) inputs)", color=INK, loc="left", fontsize=11)
-    ax.legend(frameon=False, fontsize=8, labelcolor=INK, loc="upper left")
+    # The band between FP32 and FP16 errors is empty: the legend goes there.
+    ax.legend(frameon=False, fontsize=8, labelcolor=INK, loc="lower left", bbox_to_anchor=(0.0, 0.2))
     fig.tight_layout()
     fig.savefig(path, dpi=150, facecolor=SURFACE)
     plt.close(fig)
@@ -290,12 +293,14 @@ def plot_roofline(rows, path):
     for p, q in (("int8", 1), ("fp16", 2), ("fp32", 4)):
         ax.plot(xs, np.minimum(peak / q, xs * w), color=PREC_COLOR[p], linewidth=1, linestyle="--",
                 label=f"roof {p.upper()}: min({peak // q}, AI·W)")
-    for p in PRECS:
+    # BF16 has exactly the FP16 timing and traffic (same e and q), so its points
+    # would hide FP16's: plot FP16 and say so in the legend.
+    for p in ("int8", "fp16", "fp32"):
         for mode, marker in (("prefill", "o"), ("decode", "s")):
             pts = [(float(r["ai"]), float(r["achieved"])) for r in rows
                    if r["prec"] == p and r["mode"] == mode and r["group"] in ("prefill", "decode")]
             ax.scatter(*zip(*pts), s=40, marker=marker, color=PREC_COLOR[p], edgecolors=SURFACE, linewidths=1.5,
-                       label=f"{mode} {p.upper()}", zorder=3)
+                       label=f"{mode} {p.upper()}" + (" (= BF16)" if p == "fp16" else ""), zorder=3)
     ax.set_xscale("log")
     ax.set_yscale("log")
     ax.set_xlabel("program arithmetic intensity (useful ops / DRAM byte)", color=INK2)
