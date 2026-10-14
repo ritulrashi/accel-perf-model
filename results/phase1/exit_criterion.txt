@@ -1,0 +1,136 @@
+# Phase 1 exit criterion: directed memory-system tests (hand-derived cycles)
+command: scripts/phase1_exit.sh
+
+## Provenance
+date_utc: 2026-10-14T05:52:53Z
+commit: f4155657cdd201598b9315ba2bb341514af5b79f
+tree: clean
+host: Linux 6.8.0-1064-azure x86_64
+os: Ubuntu 24.04.3 LTS
+lscpu:
+  Architecture:                            x86_64
+  CPU(s):                                  2
+  Model name:                              AMD EPYC 7763 64-Core Processor
+  Thread(s) per core:                      2
+  Core(s) per socket:                      1
+  Socket(s):                               1
+  L1d cache:                               32 KiB (1 instance)
+  L1i cache:                               32 KiB (1 instance)
+  L2 cache:                                512 KiB (1 instance)
+  L3 cache:                                32 MiB (1 instance)
+mem_total: 8132888 kB
+tools:
+  c++: c++ (Ubuntu 13.3.0-6ubuntu2~24.04) 13.3.0
+  cmake: cmake version 3.28.3
+  ninja: 1.11.1
+  systemc: 3.0.2 (release date 20251031) at /opt/systemc-3.0.2, commit 70b0fc8e4a74acc677b0fc73cea08f940c2115d5
+  googletest: 52eb8108c5bdec04579160ae17225d66034bd723  # v1.17.0
+  python3: Python 3.12.3
+  numpy: 1.26.4
+  verilator: Verilator 5.020 2024-01-01 rev (Debian 5.020-1)
+
+## Preset: asan
+### Expected vs measured (expected values from docs/phase1-design.md §6)
+count: F2D_DramToSramStrided dma0.d0.bursts expected=8 measured=8
+count: F2D_SramToDramStrided dma0.d0.bursts expected=8 measured=8
+count: T1_SingleTransfer dma0.d0.bursts expected=4 measured=4
+count: T1_SingleTransfer dram.bus_busy_cycles expected=16 measured=16
+count: T1_SingleTransfer dram.row_hits expected=3 measured=3
+count: T1_SingleTransfer dram.row_misses expected=1 measured=1
+count: T1_SingleTransfer sram.conflict_line_cycles expected=0 measured=0
+count: T1c_ReverseDirection dram.bytes_written expected=256 measured=256
+count: T2_TwoDmasShareOneChannel dram.bus_busy_cycles expected=32 measured=32
+count: T2_TwoDmasShareOneChannel dram.row_hits expected=6 measured=6
+count: T2_TwoDmasShareOneChannel dram.row_misses expected=2 measured=2
+count: T2_TwoDmasShareOneChannel sram.conflict_line_cycles expected=0 measured=0
+count: T2b_QueueBackpressure dram.backpressure_cycles expected=35 measured=35
+count: T3a_SramBankConflict sram.conflict_line_cycles expected=1 measured=1
+count: T3b_SramNoConflict sram.conflict_line_cycles expected=0 measured=0
+count: T3c_SramIntraRequestSerialization sram.conflict_line_cycles expected=0 measured=0
+count: T4a_RowHit dram.row_hits expected=1 measured=1
+count: T4b_RowMiss dram.row_misses expected=2 measured=2
+cycles: T1_SingleTransfer dma0.d0.done expected=48 measured=48
+cycles: T1b_OneBufferIsLatencyBound dma0.d0.done expected=84 measured=84
+cycles: T1c_ReverseDirection dma0.d0.done expected=48 measured=48
+cycles: T2_TwoDmasShareOneChannel dma0.d0.done expected=64 measured=64
+cycles: T2_TwoDmasShareOneChannel dma1.d0.done expected=60 measured=60
+cycles: T2b_QueueBackpressure dma0.d0.done expected=54 measured=54
+cycles: T3a_SramBankConflict tgs0.r0.response expected=2 measured=2
+cycles: T3a_SramBankConflict tgs1.r0.response expected=3 measured=3
+cycles: T3b_SramNoConflict tgs0.r0.response expected=2 measured=2
+cycles: T3b_SramNoConflict tgs1.r0.response expected=2 measured=2
+cycles: T3c_SramIntraRequestSerialization tgs0.r0.response expected=3 measured=3
+cycles: T4a_RowHit tgd0.r0.response expected=34 measured=34
+cycles: T4a_RowHit tgd0.r1.issued expected=100 measured=100
+cycles: T4a_RowHit tgd0.r1.response expected=114 measured=114
+cycles: T4b_RowMiss tgd0.r0.response expected=34 measured=34
+cycles: T4b_RowMiss tgd0.r1.issued expected=100 measured=100
+cycles: T4b_RowMiss tgd0.r1.response expected=134 measured=134
+cycles: T4c_SameBankBackToBack tgd0.r0.response expected=34 measured=34
+cycles: T4c_SameBankBackToBack tgd0.r1.issued expected=1 measured=1
+cycles: T4c_SameBankBackToBack tgd0.r1.response expected=58 measured=58
+cycles: T4d_OtherBankBackToBack tgd0.r0.response expected=34 measured=34
+cycles: T4d_OtherBankBackToBack tgd0.r1.issued expected=1 measured=1
+cycles: T4d_OtherBankBackToBack tgd0.r1.response expected=38 measured=38
+### Mismatches
+none
+### Summary
+100% tests passed, 0 tests failed out of 36
+determinism    =   0.08 sec*proc (1 test)
+sim            =   0.48 sec*proc (14 tests)
+unit           =   0.38 sec*proc (21 tests)
+-- determinism: t2 identical over 2 runs
+failed tests: none
+
+## Preset: release
+### Expected vs measured (expected values from docs/phase1-design.md §6)
+count: F2D_DramToSramStrided dma0.d0.bursts expected=8 measured=8
+count: F2D_SramToDramStrided dma0.d0.bursts expected=8 measured=8
+count: T1_SingleTransfer dma0.d0.bursts expected=4 measured=4
+count: T1_SingleTransfer dram.bus_busy_cycles expected=16 measured=16
+count: T1_SingleTransfer dram.row_hits expected=3 measured=3
+count: T1_SingleTransfer dram.row_misses expected=1 measured=1
+count: T1_SingleTransfer sram.conflict_line_cycles expected=0 measured=0
+count: T1c_ReverseDirection dram.bytes_written expected=256 measured=256
+count: T2_TwoDmasShareOneChannel dram.bus_busy_cycles expected=32 measured=32
+count: T2_TwoDmasShareOneChannel dram.row_hits expected=6 measured=6
+count: T2_TwoDmasShareOneChannel dram.row_misses expected=2 measured=2
+count: T2_TwoDmasShareOneChannel sram.conflict_line_cycles expected=0 measured=0
+count: T2b_QueueBackpressure dram.backpressure_cycles expected=35 measured=35
+count: T3a_SramBankConflict sram.conflict_line_cycles expected=1 measured=1
+count: T3b_SramNoConflict sram.conflict_line_cycles expected=0 measured=0
+count: T3c_SramIntraRequestSerialization sram.conflict_line_cycles expected=0 measured=0
+count: T4a_RowHit dram.row_hits expected=1 measured=1
+count: T4b_RowMiss dram.row_misses expected=2 measured=2
+cycles: T1_SingleTransfer dma0.d0.done expected=48 measured=48
+cycles: T1b_OneBufferIsLatencyBound dma0.d0.done expected=84 measured=84
+cycles: T1c_ReverseDirection dma0.d0.done expected=48 measured=48
+cycles: T2_TwoDmasShareOneChannel dma0.d0.done expected=64 measured=64
+cycles: T2_TwoDmasShareOneChannel dma1.d0.done expected=60 measured=60
+cycles: T2b_QueueBackpressure dma0.d0.done expected=54 measured=54
+cycles: T3a_SramBankConflict tgs0.r0.response expected=2 measured=2
+cycles: T3a_SramBankConflict tgs1.r0.response expected=3 measured=3
+cycles: T3b_SramNoConflict tgs0.r0.response expected=2 measured=2
+cycles: T3b_SramNoConflict tgs1.r0.response expected=2 measured=2
+cycles: T3c_SramIntraRequestSerialization tgs0.r0.response expected=3 measured=3
+cycles: T4a_RowHit tgd0.r0.response expected=34 measured=34
+cycles: T4a_RowHit tgd0.r1.issued expected=100 measured=100
+cycles: T4a_RowHit tgd0.r1.response expected=114 measured=114
+cycles: T4b_RowMiss tgd0.r0.response expected=34 measured=34
+cycles: T4b_RowMiss tgd0.r1.issued expected=100 measured=100
+cycles: T4b_RowMiss tgd0.r1.response expected=134 measured=134
+cycles: T4c_SameBankBackToBack tgd0.r0.response expected=34 measured=34
+cycles: T4c_SameBankBackToBack tgd0.r1.issued expected=1 measured=1
+cycles: T4c_SameBankBackToBack tgd0.r1.response expected=58 measured=58
+cycles: T4d_OtherBankBackToBack tgd0.r0.response expected=34 measured=34
+cycles: T4d_OtherBankBackToBack tgd0.r1.issued expected=1 measured=1
+cycles: T4d_OtherBankBackToBack tgd0.r1.response expected=38 measured=38
+### Mismatches
+none
+### Summary
+100% tests passed, 0 tests failed out of 36
+determinism    =   0.03 sec*proc (1 test)
+sim            =   0.12 sec*proc (14 tests)
+unit           =   0.05 sec*proc (21 tests)
+-- determinism: t2 identical over 2 runs
+failed tests: none

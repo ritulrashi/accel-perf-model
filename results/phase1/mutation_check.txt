@@ -1,0 +1,121 @@
+# Phase 1 mutation check: do the directed tests detect injected model bugs?
+command: scripts/phase1_mutation_check.sh
+
+## Provenance (of the unmutated tree the mutants were derived from)
+date_utc: 2026-10-14T05:54:30Z
+commit: f4155657cdd201598b9315ba2bb341514af5b79f
+tree: clean
+host: Linux 6.8.0-1064-azure x86_64
+os: Ubuntu 24.04.3 LTS
+lscpu:
+  Architecture:                            x86_64
+  CPU(s):                                  2
+  Model name:                              AMD EPYC 7763 64-Core Processor
+  Thread(s) per core:                      2
+  Core(s) per socket:                      1
+  Socket(s):                               1
+  L1d cache:                               32 KiB (1 instance)
+  L1i cache:                               32 KiB (1 instance)
+  L2 cache:                                512 KiB (1 instance)
+  L3 cache:                                32 MiB (1 instance)
+mem_total: 8132888 kB
+tools:
+  c++: c++ (Ubuntu 13.3.0-6ubuntu2~24.04) 13.3.0
+  cmake: cmake version 3.28.3
+  ninja: 1.11.1
+  systemc: 3.0.2 (release date 20251031) at /opt/systemc-3.0.2, commit 70b0fc8e4a74acc677b0fc73cea08f940c2115d5
+  googletest: 52eb8108c5bdec04579160ae17225d66034bd723  # v1.17.0
+  python3: Python 3.12.3
+  numpy: 1.26.4
+  verilator: Verilator 5.020 2024-01-01 rev (Debian 5.020-1)
+
+## Baseline (unmutated copy)
+ctest: tests passed, 0 tests failed out of 36
+failing tests: none
+
+## M1 (src/mem/dram_timing.cpp)
+54:  s.col_issue = s.start + (p_.t_miss - p_.t_hit);  // MUTANT M1 row hit costs a miss
+failing tests (11):
+  sim.Phase1.T1_SingleTransfer
+  sim.Phase1.T1b_OneBufferIsLatencyBound
+  sim.Phase1.T1c_ReverseDirection
+  sim.Phase1.T2_TwoDmasShareOneChannel
+  sim.Phase1.T2b_QueueBackpressure
+  sim.Phase1.T4a_RowHit
+  unit.DramTiming.T1_OpenRowStreamIsBusLimited
+  unit.DramTiming.T1c_Writes
+  unit.DramTiming.T2_TwoStreamsShareTheBus
+  unit.DramTiming.T2b_LateAcceptance
+  unit.DramTiming.T4a_RowHitAfterIdle
+required: sim.Phase1.T1_SingleTransfer sim.Phase1.T4a_RowHit
+verdict: CAUGHT
+
+## M2 (src/mem/sram_timing.cpp)
+46:    const Cycle c = accept + own[b];  // MUTANT M2 no inter-request bank conflicts
+failing tests (2):
+  sim.Phase1.T3a_SramBankConflict
+  unit.SramTiming.T3a_SameBankSameCycleSerializes
+required: sim.Phase1.T3a_SramBankConflict
+verdict: CAUGHT
+
+## M3 (src/mem/dram_timing.cpp)
+55:  s.data_start = s.col_issue + p_.t_hit;  // MUTANT M3 bus not shared
+failing tests (4):
+  sim.Phase1.T2_TwoDmasShareOneChannel
+  sim.Phase1.T4d_OtherBankBackToBack
+  unit.DramTiming.T2_TwoStreamsShareTheBus
+  unit.DramTiming.T4d_OtherBankBackToBack
+required: sim.Phase1.T2_TwoDmasShareOneChannel sim.Phase1.T4d_OtherBankBackToBack
+verdict: CAUGHT
+
+## M4 (src/mem/dram_channel.cpp)
+14:  if (false) return false;  // MUTANT M4 queue never refuses
+failing tests (1):
+  sim.Phase1.T2b_QueueBackpressure
+required: sim.Phase1.T2b_QueueBackpressure
+verdict: CAUGHT
+
+## M5 (src/common/rr_arbiter.h)
+29:    p_ = 0 * port;  // MUTANT M5 fixed priority, port 0 first
+failing tests (3):
+  sim.Phase1.T2_TwoDmasShareOneChannel
+  unit.RrArbiter.PointerSkipsPastTheFirstGrantedPort
+  unit.RrArbiter.T2_OrderAlternatesWhenBothRequestEveryCycle
+required: sim.Phase1.T2_TwoDmasShareOneChannel
+verdict: CAUGHT
+
+## M6 (src/dma/dma_engine.cpp)
+138:    write_q_.push_back(it->second); ++buffers_free_;  // MUTANT M6
+140:    // MUTANT M6 (buffer freed at read response instead)
+failing tests (1):
+  sim.Phase1.T1b_OneBufferIsLatencyBound
+required: sim.Phase1.T1b_OneBufferIsLatencyBound
+verdict: CAUGHT
+
+## M7 (src/mem/dram_timing.cpp)
+52:  s.start = accept;  // MUTANT M7 no bank occupancy
+failing tests (5):
+  sim.Phase1.T4c_SameBankBackToBack
+  unit.DramTiming.T1_OpenRowStreamIsBusLimited
+  unit.DramTiming.T1c_Writes
+  unit.DramTiming.T2_TwoStreamsShareTheBus
+  unit.DramTiming.T4c_SameBankBackToBack
+required: sim.Phase1.T4c_SameBankBackToBack
+verdict: CAUGHT
+
+## M8 (src/mem/sampled_target.cpp)
+76:    (void)0;  // MUTANT M8 writes not stored
+failing tests (8):
+  determinism.t2
+  sim.Phase1.F2D_DramToSramStrided
+  sim.Phase1.F2D_SramToDramStrided
+  sim.Phase1.T1_SingleTransfer
+  sim.Phase1.T1b_OneBufferIsLatencyBound
+  sim.Phase1.T1c_ReverseDirection
+  sim.Phase1.T2_TwoDmasShareOneChannel
+  sim.Phase1.T2b_QueueBackpressure
+required: sim.Phase1.T1_SingleTransfer sim.Phase1.T1c_ReverseDirection sim.Phase1.F2D_DramToSramStrided sim.Phase1.F2D_SramToDramStrided
+verdict: CAUGHT
+
+## Result
+all mutants caught by their required tests: yes
