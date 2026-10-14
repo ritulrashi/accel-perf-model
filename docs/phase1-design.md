@@ -112,6 +112,11 @@ Base-protocol consequences we rely on:
 
 ### 3.2 Address maps and legality
 
+> **Changed in Phase 3** (docs/BUGS.md #8): a DRAM request need only be
+> 16-byte aligned and a multiple of 16 bytes; it occupies every W-byte bus
+> beat it touches (D = beats touched). For W = 16, the value used by every
+> Phase 1/2 test, this is identical to the rule below.
+
 - **DRAM:** `col = addr % R`, `bank = (addr / R) % B`, `row = addr / (R·B)`.
   Consecutive R-byte rows rotate across banks. A request must be a multiple
   of W bytes, at most `burst_bytes`, and must not cross a row.

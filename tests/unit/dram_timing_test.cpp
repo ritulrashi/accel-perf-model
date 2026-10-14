@@ -37,8 +37,8 @@ TEST(DramTiming, AddressMapRotatesRowsAcrossBanks) {
 TEST(DramTiming, RejectsIllegalRequests) {
   DramTiming t{DramParams{}};
   EXPECT_THROW(t.check_legal(0, 0), std::invalid_argument);
-  EXPECT_THROW(t.check_legal(0, 8), std::invalid_argument);     // not a bus multiple
-  EXPECT_THROW(t.check_legal(8, 16), std::invalid_argument);    // misaligned
+  EXPECT_THROW(t.check_legal(0, 8), std::invalid_argument);     // below the 16 B granule
+  EXPECT_THROW(t.check_legal(8, 16), std::invalid_argument);    // not 16-byte aligned
   EXPECT_THROW(t.check_legal(0, 128), std::invalid_argument);   // > burst
   EXPECT_THROW(t.check_legal(1008, 32), std::invalid_argument); // crosses a row
   EXPECT_NO_THROW(t.check_legal(960, 64));
@@ -117,3 +117,16 @@ TEST(DramTiming, T4d_OtherBankBackToBack) {
   t.schedule(0, 0, 64);
   expect_sched(t.schedule(1, 1024, 64), false, 1, 21, 34, 38);
 }
+
+// Phase 3 (BUGS #8): requests narrower than or misaligned to a wide bus
+// occupy every beat they touch. W = 32: 16 B -> 1 beat; 32 B at +16 -> 2 beats.
+TEST(DramTiming, PartialBeatsOnAWideBus) {
+  DramParams p;
+  p.bus_bytes_per_cycle = 32;
+  p.t_miss = p.t_hit;  // isolate the beat count
+  DramTiming t{p};
+  expect_sched(t.schedule(0, 0, 16), false, 0, 0, 10, 11);      // 1 beat
+  expect_sched(t.schedule(100, 16, 32), true, 100, 100, 110, 112);  // beats 0 and 1
+  EXPECT_EQ(t.bus_busy_cycles(), 3u);
+}
+

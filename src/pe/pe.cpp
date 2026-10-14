@@ -4,28 +4,24 @@
 #include <cstring>
 #include <stdexcept>
 
-
 namespace apm {
 
-Pe::Pe(sc_core::sc_module_name name, const PeConfig& cfg, const GemmLayout& job)
+Pe::Pe(sc_core::sc_module_name name, const PeConfig& cfg, PeJob& job)
     : sc_module(name),
       lmem("lmem", cfg.lmem),
       dma("dma", cfg.dma),
       cfg_(cfg),
-      layout_(job),
+      job_(job),
       acc_(cfg.array) {
-  // Validation and both capacity-check layers (§2.4) happen in plan_pe().
-  const PeBuffers bufs = plan_pe(cfg, job);
+  // Both LMEM capacity-check layers (Phase 2 §2.4) happen in plan_pe_buffers().
+  const PeBuffers bufs = plan_pe_buffers(cfg);
   a_buf_ = bufs.a;
   b_buf_ = bufs.b;
   out_buf_ = bufs.out;
 
-  const std::uint64_t steps = layout_.steps(), tiles = layout_.tiles();
-  loads_done_.assign(steps, 0);
-  loaded_at_.assign(steps, -1);
-  feed_start_.assign(steps, -1);
-  tile_done_.assign(tiles, -1);
-  store_done_.assign(tiles, -1);
+  loads_done_.assign(job_.steps(), 0);
+  steps_.assign(job_.steps(), StepRec{});
+  tiles_.assign(job_.tiles(), TileRec{});
 
   dma.sram_socket.bind(lmem.socket);
   dma.set_done_callback([this](std::size_t id, Cycle at) { on_dma_done(id, at); });
@@ -36,38 +32,36 @@ Pe::Pe(sc_core::sc_module_name name, const PeConfig& cfg, const GemmLayout& job)
 
 bool Pe::operand_buffer_free(std::uint64_t step, Cycle now) const {
   if (step < cfg_.n_buf) return true;
-  const std::int64_t f = feed_start_[step - cfg_.n_buf];
-  // A buffer is free once its chunk's feed has ended (Â§2.3 rule 2).
+  const std::int64_t f = steps_[step - cfg_.n_buf].feed;
+  // A buffer is free once its chunk's feed has ended (Phase 2 §2.3 rule 2).
   return f >= 0 && static_cast<Cycle>(f) + cfg_.kt <= now;
 }
 
-void Pe::issue_loads(std::uint64_t step) {
-  const std::uint64_t t = step / layout_.chunks(), c = step % layout_.chunks();
-  const std::uint64_t mi = t / layout_.tiles_n(), nj = t % layout_.tiles_n();
+void Pe::issue_loads(std::uint64_t step, Cycle now) {
   const unsigned buf = static_cast<unsigned>(step % cfg_.n_buf);
-  const std::uint64_t a_sz = layout_.a_block_bytes(), b_sz = layout_.b_block_bytes();
-
-  record(dma.submit({DmaDir::DramToSram, layout_.a_block_addr(mi, c), a_buf_[buf], 1, a_sz, a_sz,
-                     a_sz}),
-         {Kind::LoadA, step});
-  record(dma.submit({DmaDir::DramToSram, layout_.b_block_addr(nj, c), b_buf_[buf], 1, b_sz, b_sz,
-                     b_sz}),
-         {Kind::LoadB, step});
+  const std::uint64_t a_sz = std::uint64_t{cfg_.array.rows} * cfg_.kt;
+  const std::uint64_t b_sz = cfg_.kt * cfg_.array.cols;
+  StepRec& r = steps_[step];
+  r.loads_submit = static_cast<std::int64_t>(now);
+  r.a_desc = dma.submit({DmaDir::DramToSram, job_.a_src(step), a_buf_[buf], 1, a_sz, a_sz, a_sz});
+  record(r.a_desc, {Kind::LoadA, step});
+  r.b_desc = dma.submit({DmaDir::DramToSram, job_.b_src(step), b_buf_[buf], 1, b_sz, b_sz, b_sz});
+  record(r.b_desc, {Kind::LoadB, step});
 }
 
 void Pe::try_feed(Cycle now) {
-  if (next_feed_ >= layout_.steps() || feeding_until_ > now) return;
+  if (next_feed_ >= job_.steps() || feeding_until_ > now) return;
   const std::uint64_t s = next_feed_;
   if (loads_done_[s] < 2) return;
-  const std::uint64_t t = s / layout_.chunks(), c = s % layout_.chunks();
+  const std::uint64_t t = s / job_.chunks(), c = s % job_.chunks();
   if (c == 0) {
     if (tile_in_array_) return;  // one accumulator set: wait for the previous drain
-    if (t >= cfg_.n_out && store_done_[t - cfg_.n_out] < 0) return;  // output buffer still busy
+    if (t >= cfg_.n_out && tiles_[t - cfg_.n_out].store_done < 0) return;  // output buffer still busy
     acc_.clear();
     tile_in_array_ = true;
     cur_tile_ = t;
   }
-  feed_start_[s] = static_cast<std::int64_t>(now);
+  steps_[s].feed = static_cast<std::int64_t>(now);
   feeding_until_ = now + cfg_.kt;
   ++next_feed_;
 
@@ -75,12 +69,12 @@ void Pe::try_feed(Cycle now) {
   // operands cannot change before feed end because their buffer is not
   // reloaded until then.
   const unsigned buf = static_cast<unsigned>(s % cfg_.n_buf);
-  std::vector<std::int8_t> a(layout_.a_block_bytes()), b(layout_.b_block_bytes());
+  std::vector<std::int8_t> a(std::uint64_t{cfg_.array.rows} * cfg_.kt), b(cfg_.kt * cfg_.array.cols);
   lmem.peek(a_buf_[buf], reinterpret_cast<std::uint8_t*>(a.data()), a.size());
   lmem.peek(b_buf_[buf], reinterpret_cast<std::uint8_t*>(b.data()), b.size());
   acc_.accumulate(a.data(), b.data(), cfg_.kt);
 
-  if (c + 1 == layout_.chunks()) {  // last chunk: the drain follows (§2.2)
+  if (c + 1 == job_.chunks()) {  // last chunk: the drain follows (Phase 2 §2.2)
     tile_done_at_ = tile_done(cfg_.array, now, cfg_.kt);
     drain_pending_ = true;
   }
@@ -88,7 +82,6 @@ void Pe::try_feed(Cycle now) {
 
 void Pe::finish_tile(Cycle now) {
   const std::uint64_t t = cur_tile_;
-  const std::uint64_t mi = t / layout_.tiles_n(), nj = t % layout_.tiles_n();
   const std::uint64_t out = out_buf_[t % cfg_.n_out];
   const auto& v = acc_.values();
   // The drain writes INT32 results (little-endian, host order) into the output buffer.
@@ -97,12 +90,18 @@ void Pe::finish_tile(Cycle now) {
   lmem.poke(out, bytes.data(), bytes.size());
   tile_in_array_ = false;
   drain_pending_ = false;
-  tile_done_[t] = static_cast<std::int64_t>(now);
+  tiles_[t].done = static_cast<std::int64_t>(now);
+  store_q_.push_back(t);
+}
 
-  const std::uint64_t row = 4ull * cfg_.array.cols;
-  record(dma.submit({DmaDir::SramToDram, out, layout_.c_tile_addr(mi, nj), cfg_.array.rows, row,
-                     row, 4 * layout_.shape.n}),
-         {Kind::Store, t});
+void Pe::try_stores(Cycle now) {
+  while (!store_q_.empty() && job_.store_allowed(store_q_.front())) {
+    const std::uint64_t t = store_q_.front();
+    store_q_.pop_front();
+    tiles_[t].store_submit = static_cast<std::int64_t>(now);
+    tiles_[t].store_desc = dma.submit(job_.store(t, out_buf_[t % cfg_.n_out]));
+    record(tiles_[t].store_desc, {Kind::Store, t});
+  }
 }
 
 void Pe::record(std::size_t desc_id, DescInfo info) {
@@ -114,11 +113,13 @@ void Pe::on_dma_done(std::size_t id, Cycle at) {
   // Called from inside the TLM backward path: record and wake, nothing else.
   const DescInfo& d = desc_info_.at(id);
   if (d.kind == Kind::Store) {
-    store_done_[d.index] = static_cast<std::int64_t>(at);
+    tiles_[d.index].store_done = static_cast<std::int64_t>(at);
     ++stores_done_;
     done_cycle_ = std::max(done_cycle_, at);
+    job_.on_store_done(d.index, at);
   } else if (++loads_done_[d.index] == 2) {
-    loaded_at_[d.index] = static_cast<std::int64_t>(at);
+    steps_[d.index].loaded = static_cast<std::int64_t>(at);
+    job_.on_loads_done(d.index, at);
   }
   wake_now_.notify(sc_core::SC_ZERO_TIME);
 }
@@ -146,7 +147,10 @@ void Pe::act() {
     require(tile_done_at_ >= now, "Pe: missed a tile-done deadline");
     if (tile_done_at_ == now) finish_tile(now);
   }
-  while (next_load_ < layout_.steps() && operand_buffer_free(next_load_, now)) issue_loads(next_load_++);
+  try_stores(now);
+  while (next_load_ < job_.steps() && operand_buffer_free(next_load_, now) &&
+         job_.operands_ready(next_load_))
+    issue_loads(next_load_++, now);
   try_feed(now);
   arm_wake(now);
 }
@@ -155,13 +159,13 @@ void Pe::report(std::map<std::string, std::uint64_t>& out) const {
   const std::string p = std::string(basename()) + ".";
   out[p + "done"] = done_cycle_;
   out[p + "lmem_required"] = cfg_.lmem_required();
-  for (std::uint64_t s = 0; s < layout_.steps(); ++s) {
-    out[p + "s" + std::to_string(s) + ".loaded"] = static_cast<std::uint64_t>(loaded_at_[s]);
-    out[p + "s" + std::to_string(s) + ".feed"] = static_cast<std::uint64_t>(feed_start_[s]);
+  for (std::uint64_t s = 0; s < steps_.size(); ++s) {
+    out[p + "s" + std::to_string(s) + ".loaded"] = static_cast<std::uint64_t>(steps_[s].loaded);
+    out[p + "s" + std::to_string(s) + ".feed"] = static_cast<std::uint64_t>(steps_[s].feed);
   }
-  for (std::uint64_t t = 0; t < layout_.tiles(); ++t) {
-    out[p + "t" + std::to_string(t) + ".done"] = static_cast<std::uint64_t>(tile_done_[t]);
-    out[p + "t" + std::to_string(t) + ".store_done"] = static_cast<std::uint64_t>(store_done_[t]);
+  for (std::uint64_t t = 0; t < tiles_.size(); ++t) {
+    out[p + "t" + std::to_string(t) + ".done"] = static_cast<std::uint64_t>(tiles_[t].done);
+    out[p + "t" + std::to_string(t) + ".store_done"] = static_cast<std::uint64_t>(tiles_[t].store_done);
   }
 }
 

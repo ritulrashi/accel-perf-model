@@ -23,6 +23,10 @@ struct SramSchedule {
   // Sum over lines of the cycles that line waited for another request's use
   // of its bank. Serialization within the request itself is not counted.
   std::uint64_t conflict_line_cycles;
+  // Extra cycles this request's response is late because of other
+  // requests: (last line cycle) - (accept + most lines in any one bank - 1).
+  // Used by the Phase 3 stall stack (sram_conflict).
+  Cycle conflict_delay;
 };
 
 class SramTiming {

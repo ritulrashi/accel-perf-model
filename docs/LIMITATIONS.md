@@ -76,3 +76,45 @@ What this project does **not** model or verify. Updated every phase.
 - **Functional coverage:** 200 random cases over arrays R ∈ {1,2,4,8} ×
   C ∈ {16,32}, Kt ∈ {16,32,64}, small M/N/K, and both buffering modes. This
   is good evidence for these shapes, not a proof for all shapes.
+
+## Accelerator grid, stall stack, roofline (Phase 3)
+- **Mesh:** XY routing only, with virtual cut-through and unbounded router
+  buffers. A blocked packet never holds an upstream link, so there is no
+  wormhole blocking, no credit backpressure and no deadlock modelling.
+  - **Simplified latency:** fixed per-hop latency, no router pipeline
+    stages, and local delivery (H = 0) costs one cycle with no bandwidth
+    limit.
+  - **Traffic:** control packets (read requests, write acks) occupy a link
+    for one cycle; nothing else (headers, routing info) is modelled.
+- **One SRAM channel per PE.** Each PE has its own port into the shared
+  SRAM, so the SRAM never serializes requests by port, only by bank. A
+  real design would funnel them through fewer network-interface ports.
+- **The global DMA has a dedicated DRAM↔SRAM path** outside the mesh, and
+  the shared SRAM sits at a single mesh node.
+- **The scheduler is static and simple:** waves of Px×Py output tiles,
+  chunk-sets staged in order, one ring of D slots, per-step gating on the
+  step's own two blocks.
+  - **Not modelled:** reordering across waves, prefetch heuristics, B-block
+    reuse across waves, and multicast of a shared block to several PEs.
+    Each PE fetches its own copy over the mesh, which is why the NoC
+    ceiling binds so often.
+- **The stall stack is post-hoc and location-based.**
+  - **Location:** a waiting cycle is charged to where the critical data is
+    (the oldest unfinished burst), not to the "root cause" of the wait. For
+    example, a burst queued behind another PE's traffic in the mesh counts
+    as `network` even if the SRAM was the reason the earlier packet was
+    late.
+  - **Synchronization:** waits for the ring to free count as `idle`.
+  - **Conflicts:** `sram_conflict` covers only the extra delay caused by
+    other requests, placed at the start of the residency by convention.
+- **Roofline ceilings are formulas.**
+  - **NoC ceiling:** counts operand-load bytes on the busiest link. Control
+    packets and the write traffic on reverse links are left out, so it is
+    an upper bound, not a prediction.
+  - **No on-chip SRAM ceiling:** the shared SRAM's bank bandwidth is not
+    one of the ceilings. The sweep's §4.1 configurations use 16 banks so
+    that it does not bind.
+- **Sweep coverage:** 115 configurations, with grids up to 3×3 and arrays
+  up to 16×16. The results describe this model at these sizes, not real
+  accelerators.
+

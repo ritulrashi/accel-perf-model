@@ -31,10 +31,14 @@ struct PeBuffers {
   std::vector<std::uint64_t> a, b, out;
 };
 
-// Validates the job and the configuration together and places the buffers.
-// Throws std::invalid_argument with a message naming the problem:
+// Places the PE's LMEM buffers. Throws std::invalid_argument with a message
+// naming the problem:
 //   layer (a) total LMEM requirement vs capacity,
 //   layer (b) each buffer through the line-aligned bump allocator.
+PeBuffers plan_pe_buffers(const PeConfig& cfg);
+
+// Phase 2 single-PE GEMM: validates the job against the configuration, then
+// plan_pe_buffers().
 PeBuffers plan_pe(const PeConfig& cfg, const GemmLayout& job);
 
 }  // namespace apm

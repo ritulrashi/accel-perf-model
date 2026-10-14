@@ -36,7 +36,7 @@ mutants=(
   "N4|src/pe/pe.cpp|s#^  if (loads_done_\[s\] < 2) return;#  if (false) return;  // MUTANT N4 feed ignores loads#|sim.Phase2.T4_DoubleBufferedMemoryBound functional.gemm20"
   "N5|src/pe/pe.cpp|s#return f >= 0 \&\& static_cast<Cycle>(f) + cfg_.kt <= now;#return f >= 0 \&\& static_cast<Cycle>(f) <= now;  // MUTANT N5 freed at feed start#|sim.Phase2.T2_DoubleBufferedComputeBound"
   "N6|src/pe/pe.cpp|s#^    if (tile_in_array_) return;.*#    // MUTANT N6 next tile does not wait for the drain#|sim.Phase2.T5_TwoOutputTiles"
-  "N7|src/pe/pe.cpp|s#^    if (t >= cfg_.n_out \&\& store_done_\[t - cfg_.n_out\] < 0) return;.*#    // MUTANT N7 output buffer rule ignored#|sim.Phase2.T5b_OneOutputBuffer"
+  "N7|src/pe/pe.cpp|s#^    if (t >= cfg_.n_out \&\& tiles_\[t - cfg_.n_out\].store_done < 0) return;.*#    // MUTANT N7 output buffer rule ignored#|sim.Phase2.T5b_OneOutputBuffer"
   "N8|src/pe/gemm_layout.cpp|s#const std::uint64_t blk = b_block_addr(nj, c) - b_base;#const std::uint64_t blk = b_block_addr(nj, (c + 1) % chunks()) - b_base;  // MUTANT N8 B blocks permuted#|functional.gemm20"
   "N9|tools/gemm_ref.cpp|s#for (std::uint64_t k = 0; k < K; ++k) s +=#for (std::uint64_t k = 0; k + 1 < K; ++k) s +=  /* MUTANT N9 reference drops last k */#|functional.gemm20"
 )
@@ -80,7 +80,7 @@ expected_lines() { echo 1; }
       for t in $required; do
         grep -qx "$t" <<< "$fails" || { verdict="MISSED (required $t passed)"; all_caught=no; }
       done
-      grep -hoE "functional: seed=.*" "$stage/ctest.log" | sed "s/^/  3-way summary: /" || true
+      grep -hoE "functional: .*seed=.*" "$stage/ctest.log" | sed "s/^/  3-way summary: /" || true
       echo "required: $required"
       echo "verdict: $verdict"
     fi

@@ -46,7 +46,7 @@ run() {
       | awk '{split($4,e,"="); split($5,m,"="); if (e[2] != m[2]) {print; n++}} END {if (!n) print "none"}'
     echo "### Summary"
     grep -E 'tests passed|^ *(unit|sim|determinism|functional) +=' "$logs/$preset-ctest.log" || true
-    grep -hoE 'functional: seed=.*' "$logs/$preset-ctest.log" | sed 's/^/ctest 20-case /' || true
+    grep -hoE 'functional: .*seed=.*' "$logs/$preset-ctest.log" | sed 's/^/ctest 20-case /' || true
     grep -A100 'The following tests FAILED' "$logs/$preset-ctest.log" || echo "failed tests: none"
   done
 

@@ -12,6 +12,9 @@
 namespace apm {
 
 struct DramParams {
+  // Smallest legal request and its alignment (bytes). Requests need not be
+  // bus-aligned; they occupy every W-byte beat they touch.
+  static constexpr unsigned kGranule = 16;
   unsigned banks = 4;
   std::uint64_t row_bytes = 1024;
   unsigned bus_bytes_per_cycle = 16;  // W

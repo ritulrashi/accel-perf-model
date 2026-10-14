@@ -28,8 +28,16 @@
 
 #include "common/cycle.h"
 #include "common/rr_arbiter.h"
+#include "common/trace.h"
 
 namespace apm {
+
+// What a target decided for one accepted request.
+struct AcceptInfo {
+  Cycle response = 0;              // must be > accept cycle
+  Cycle conflict = 0;              // leading cycles spent waiting for banks held by others
+  StallCat cat = StallCat::Dma;    // what the rest of the residency counts as (stall stack)
+};
 
 class SampledTarget : public sc_core::sc_module {
  public:
@@ -54,9 +62,9 @@ class SampledTarget : public sc_core::sc_module {
   // Called once per sample point before any grant (cycle = accept cycle).
   virtual void begin_sample(Cycle) {}
   // Decide one request at its sample point. Return false to leave it pending;
-  // otherwise schedule it and set `response` (must be > accept).
-  virtual bool accept(const tlm::tlm_generic_payload& trans, Cycle accept,
-                      Cycle& response) = 0;
+  // otherwise schedule it and fill `info`. Traced bursts get the segments
+  // [arrival, accept) and [accept, response) split by info.conflict.
+  virtual bool accept(const tlm::tlm_generic_payload& trans, Cycle accept, AcceptInfo& info) = 0;
 
   void end_of_elaboration() override;
 
@@ -70,6 +78,7 @@ class SampledTarget : public sc_core::sc_module {
 
   std::vector<std::uint8_t> store_;
   std::vector<tlm::tlm_generic_payload*> pending_;  // per port, at most one
+  std::vector<Cycle> arrived_;                      // per port, cycle of the pending BEGIN_REQ
   std::unique_ptr<RrArbiter> arbiter_;
   sc_core::sc_event sample_ev_;
   tlm_utils::peq_with_get<tlm::tlm_generic_payload> resp_peq_;

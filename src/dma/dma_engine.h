@@ -30,6 +30,8 @@
 #include <vector>
 
 #include "common/cycle.h"
+#include "common/trace.h"
+#include "common/trace_ext.h"
 #include "dma/dma_types.h"
 
 namespace apm {
@@ -55,16 +57,27 @@ class DmaEngine : public sc_core::sc_module {
   // descriptor id (0, 1, ... in submission order).
   std::size_t submit(const TileDesc& d);
   void set_done_callback(DoneCallback cb) { on_done_ = std::move(cb); }
+  // Phase 3 stall stack: when on, every burst carries a TraceExt and its
+  // finished record is kept (burst_records(desc)[i] for the i-th burst).
+  void set_trace(bool on) { trace_ = on; }
+  const std::vector<BurstRecord>& burst_records(std::size_t desc) const { return archive_.at(desc); }
 
   const std::vector<DescResult>& results() const { return results_; }
   void report(std::map<std::string, std::uint64_t>& out) const;
 
  private:
   struct Burst {
-    std::size_t desc;
+    std::size_t desc, idx;  // descriptor id, position within the descriptor
     DmaDir dir;
     std::vector<std::uint8_t> data;
+    std::vector<Segment> segs;  // trace, appended by every component on the way
+    TraceExt rd_ext, wr_ext;
     tlm::tlm_generic_payload rd, wr;
+    // The payloads must not free our member extensions when destroyed.
+    ~Burst() {
+      rd.clear_extension(&rd_ext);
+      wr.clear_extension(&wr_ext);
+    }
   };
   using Socket = tlm_utils::simple_initiator_socket<DmaEngine>;
 
@@ -90,6 +103,8 @@ class DmaEngine : public sc_core::sc_module {
   unsigned buffers_free_;
   bool dram_busy_ = false, sram_busy_ = false;  // waiting for END_REQ on that socket
   DoneCallback on_done_;
+  bool trace_ = false;
+  std::vector<std::vector<BurstRecord>> archive_;  // by descriptor, by burst index
   sc_core::sc_event act_now_, act_next_;
 };
 

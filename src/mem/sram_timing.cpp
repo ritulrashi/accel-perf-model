@@ -49,9 +49,11 @@ SramSchedule SramTiming::schedule(Cycle accept, std::uint64_t addr, std::uint64_
     ++own[b];
     last = std::max(last, c);
   }
+  std::uint64_t max_own = 0;
+  for (std::uint64_t o : own) max_own = std::max(max_own, o);
   lines_ += n;
   conflict_ += conflict;
-  return {last + p_.t_sram, n, conflict};
+  return {last + p_.t_sram, n, conflict, last - (accept + max_own - 1)};
 }
 
 }  // namespace apm

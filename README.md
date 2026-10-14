@@ -16,12 +16,12 @@ configurable modelling parameter, not a datasheet value. See
 |---|---|---|---|
 | 1 | Memory system: DRAM channel, banked SRAM, DMA | [docs/phase1-design.md](docs/phase1-design.md) | done: [exit criterion](results/phase1/exit_criterion.txt), [mutation check](results/phase1/mutation_check.txt) |
 | 2 | Compute unit, double buffering, functional reference | [docs/phase2-design.md](docs/phase2-design.md) | done: [exit criterion](results/phase2/exit_criterion.txt), [functional cases](results/phase2/functional.csv), [mutation check](results/phase2/mutation_check.txt) |
-| 3 | Accelerator top, stall stack, roofline | — | not started |
+| 3 | Accelerator top, stall stack, roofline | [docs/phase3-design.md](docs/phase3-design.md) | in progress |
 | 4 | Attention / GenAI workloads, precision modes | — | not started |
 | 5 | Microarchitecture sweeps, SystemVerilog correlation | — | not started |
 | 6 | Automation and CI | — | not started |
 
-## Architecture (through Phase 2)
+## Architecture (through Phase 3)
 
 ```
                  ┌──────────────────────── PE ───────────────────────────┐
@@ -44,6 +44,21 @@ configurable modelling parameter, not a datasheet value. See
   model computes real INT8→INT32 results, which are checked bit-exactly
   against NumPy and a standalone C++ reference. See
   [docs/phase2-design.md](docs/phase2-design.md).
+- **Accelerator (Phase 3):** a Px×Py grid of these PEs on a mesh (XY
+  routing, fixed hop latency, per-link bandwidth), a shared banked SRAM, and
+  a scheduler that stages operand blocks DRAM→SRAM once per wave and lets
+  every PE that needs them fetch them over the mesh.
+  - **Stall stack:** every PE-cycle is charged to exactly one of compute,
+    dram, sram_conflict, network, dma or idle. Every run asserts that the
+    stack sums to P·T_end, that compute matches the tile formula, and that
+    DRAM bytes match the staging formula.
+  - **Roofline:** a three-ceiling roofline (compute, DRAM, NoC) computed
+    from formulas only. See [docs/phase3-design.md](docs/phase3-design.md).
+
+```
+ DRAM ─ global DMA ─ shared SRAM @ router sram_node ─┬─ mesh ─ PE(0,0) … PE(Px-1,Py-1)
+                                                      (each PE as above, operands via the mesh)
+```
 
 ## Build and test
 
@@ -60,6 +75,10 @@ build/release/apm_scenario t2            # one scenario, JSON cycles and counter
 # one GEMM: A.bin (M*K int8) and B.bin (K*N int8) in, C.bin (M*N int32) out, cycles as JSON
 build/release/apm_gemm M=8 N=32 K=128 R=4 C=16 Kt=64 a=A.bin b=B.bin out=C.bin
 python3 python/gemm_check.py --apm-gemm build/release/apm_gemm --gemm-ref build/release/gemm_ref --cases 20
+# one GEMM on a 2x3 grid with the SRAM in the middle: cycles and the stall stack as JSON
+build/release/apm_accel M=16 N=96 K=256 R=4 C=16 Kt=64 px=2 py=3 sram_x=1 sram_y=1 seed=3
+python3 python/roofline.py                                       # formula-only ceilings, design note §4.1
+python3 python/sweep_p3.py --apm-accel build/release/apm_accel --out-dir /tmp/sweep
 ```
 
 ## Reproducing results
@@ -72,6 +91,10 @@ python3 python/gemm_check.py --apm-gemm build/release/apm_gemm --gemm-ref build/
 | All Phase 2 results, each on a clean tree | `scripts/phase2_results.sh` | the three files below |
 | Phase 2 exit criterion (hand-derived timing, both presets, 200-case functional match) | `scripts/phase2_exit.sh` | `results/phase2/exit_criterion.txt`, `results/phase2/functional.csv` |
 | Phase 2 mutation check | `scripts/phase2_mutation_check.sh` | `results/phase2/mutation_check.txt` |
+| All Phase 3 results, each on a clean tree | `scripts/phase3_results.sh` | the files below |
+| Phase 3 exit criterion: hand-derived stall stacks, 100-case grid functional match, 115-config sweep | `scripts/phase3_exit.sh` | `results/phase3/exit_criterion.txt`, `functional_accel.csv`, `sweep.csv`, `roofline.png`, `stall_stacks.png` |
+| Phase 3 mutation check | `scripts/phase3_mutation_check.sh` | `results/phase3/mutation_check.txt` |
+| Every number in RESULTS.md | `scripts/check_results.sh` | pass/fail |
 
 Every results file starts with a provenance block (`scripts/env_report.sh`):
 commit, clean/dirty tree, machine, and tool versions.
@@ -80,5 +103,7 @@ commit, clean/dirty tree, machine, and tool versions.
 
 - [docs/phase1-design.md](docs/phase1-design.md): Phase 1 design note
 - [docs/phase2-design.md](docs/phase2-design.md): Phase 2 design note
+- [docs/phase3-design.md](docs/phase3-design.md): Phase 3 design note
+- [RESULTS.md](RESULTS.md): measured results and hypothesis verdicts
 - [docs/BUGS.md](docs/BUGS.md): every bug found, and how it was detected
 - [docs/LIMITATIONS.md](docs/LIMITATIONS.md): what is not modelled

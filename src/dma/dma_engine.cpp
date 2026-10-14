@@ -61,11 +61,17 @@ std::size_t DmaEngine::submit(const TileDesc& d) {
       const std::uint64_t chunk = std::min(left, p_.burst_bytes - dram_addr % p_.burst_bytes);
       auto b = std::make_unique<Burst>();
       b->desc = id;
+      b->idx = res.bursts;
       b->dir = d.dir;
       b->data.assign(chunk, 0);
       const auto len = static_cast<std::uint32_t>(chunk);
       init_payload(b->rd, tlm::TLM_READ_COMMAND, s, b->data.data(), len);
       init_payload(b->wr, tlm::TLM_WRITE_COMMAND, t, b->data.data(), len);
+      if (trace_) {
+        b->rd_ext.segs = b->wr_ext.segs = &b->segs;
+        b->rd.set_extension(&b->rd_ext);
+        b->wr.set_extension(&b->wr_ext);
+      }
       to_read_.push_back(std::move(b));
       ++res.bursts;
       s += chunk;
@@ -75,6 +81,7 @@ std::size_t DmaEngine::submit(const TileDesc& d) {
   }
   results_.push_back(res);
   remaining_.push_back(res.bursts);
+  archive_.emplace_back(trace_ ? res.bursts : 0);
   if (running) act_now_.notify(sc_core::SC_ZERO_TIME);
   return id;
 }
@@ -137,6 +144,7 @@ tlm::tlm_sync_enum DmaEngine::on_bw(Socket& s, tlm_generic_payload& trans, tlm::
   } else {
     ++buffers_free_;
     const std::size_t id = b->desc;
+    if (trace_) archive_[id][b->idx] = BurstRecord{results_[id].submit, now_cycle(), std::move(b->segs)};
     live_.erase(&b->rd);
     live_.erase(&b->wr);
     owned_.erase(b);  // the burst (and its payloads) is finished

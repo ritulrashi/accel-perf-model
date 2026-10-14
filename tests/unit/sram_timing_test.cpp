@@ -33,6 +33,8 @@ TEST(SramTiming, T3a_SameBankSameCycleSerializes) {
   EXPECT_EQ(a.conflict_line_cycles, 0u);
   EXPECT_EQ(b.conflict_line_cycles, 1u);
   EXPECT_EQ(t.conflict_line_cycles(), 1u);
+  EXPECT_EQ(a.conflict_delay, 0u);  // Phase 3: per-request delay for the stall stack
+  EXPECT_EQ(b.conflict_delay, 1u);
 }
 
 TEST(SramTiming, T3b_DifferentBanksDoNotConflict) {
@@ -48,6 +50,7 @@ TEST(SramTiming, T3c_IntraRequestSerializationIsNotAConflict) {
   EXPECT_EQ(s.response, 3u);
   EXPECT_EQ(s.lines, 16u);
   EXPECT_EQ(s.conflict_line_cycles, 0u);
+  EXPECT_EQ(s.conflict_delay, 0u);
 }
 
 TEST(SramTiming, T1_WritesNeverCollide) {

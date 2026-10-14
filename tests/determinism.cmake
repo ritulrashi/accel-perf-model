@@ -1,11 +1,16 @@
-# Runs one scenario twice in separate processes and requires identical output.
+# Runs one model invocation twice in separate processes and requires
+# byte-identical output (rule 5). EXE is the program, ARGS its argument list.
 foreach(i 1 2)
-  execute_process(COMMAND ${EXE} ${SCENARIO} OUTPUT_VARIABLE out${i} RESULT_VARIABLE rc${i})
+  execute_process(COMMAND ${EXE} ${ARGS} OUTPUT_VARIABLE out${i} RESULT_VARIABLE rc${i})
   if(NOT rc${i} EQUAL 0)
-    message(FATAL_ERROR "run ${i} of ${SCENARIO} failed (exit ${rc${i}})")
+    message(FATAL_ERROR "run ${i} of ${EXE} ${ARGS} failed (exit ${rc${i}})")
   endif()
 endforeach()
 if(NOT out1 STREQUAL out2)
-  message(FATAL_ERROR "non-deterministic output for ${SCENARIO}:\n--- run 1\n${out1}\n--- run 2\n${out2}")
+  message(FATAL_ERROR "non-deterministic output for ${ARGS}:
+--- run 1
+${out1}
+--- run 2
+${out2}")
 endif()
-message(STATUS "determinism: ${SCENARIO} identical over 2 runs")
+message(STATUS "determinism: ${ARGS} identical over 2 runs")

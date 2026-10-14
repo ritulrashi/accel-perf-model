@@ -19,7 +19,7 @@ class DramChannel : public SampledTarget {
 
  protected:
   void begin_sample(Cycle c) override;
-  bool accept(const tlm::tlm_generic_payload& trans, Cycle accept, Cycle& response) override;
+  bool accept(const tlm::tlm_generic_payload& trans, Cycle accept, AcceptInfo& info) override;
 
  private:
   DramTiming timing_;

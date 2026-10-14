@@ -5,8 +5,11 @@ namespace apm {
 Sram::Sram(sc_core::sc_module_name name, const SramParams& p)
     : SampledTarget(name, p.capacity_bytes), timing_(p) {}
 
-bool Sram::accept(const tlm::tlm_generic_payload& trans, Cycle accept, Cycle& response) {
-  response = timing_.schedule(accept, trans.get_address(), trans.get_data_length()).response;
+bool Sram::accept(const tlm::tlm_generic_payload& trans, Cycle accept, AcceptInfo& info) {
+  const SramSchedule s = timing_.schedule(accept, trans.get_address(), trans.get_data_length());
+  info.response = s.response;
+  info.conflict = s.conflict_delay;
+  info.cat = StallCat::Dma;  // base access latency
   return true;
 }
 

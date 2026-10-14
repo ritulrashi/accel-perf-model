@@ -12,6 +12,8 @@ void DramParams::validate() const {
     throw std::invalid_argument("DramParams: zero-sized parameter");
   if (t_hit == 0) throw std::invalid_argument("DramParams: t_hit must be >= 1");
   if (t_miss < t_hit) throw std::invalid_argument("DramParams: t_miss must be >= t_hit");
+  if (bus_bytes_per_cycle % kGranule != 0)
+    throw std::invalid_argument("DramParams: bus width must be a multiple of the 16-byte granule");
   if (burst_bytes % bus_bytes_per_cycle != 0)
     throw std::invalid_argument("DramParams: burst_bytes must be a multiple of the bus width");
   if (row_bytes % burst_bytes != 0)
@@ -33,8 +35,8 @@ void DramTiming::check_legal(std::uint64_t addr, std::uint64_t size) const {
     throw std::invalid_argument(std::string("illegal DRAM request (") + why + "): addr=" +
                                 std::to_string(addr) + " size=" + std::to_string(size));
   };
-  if (size == 0 || size % p_.bus_bytes_per_cycle != 0) fail("size not a multiple of bus width");
-  if (addr % p_.bus_bytes_per_cycle != 0) fail("address not bus-aligned");
+  if (size == 0 || size % DramParams::kGranule != 0) fail("size not a multiple of the 16-byte granule");
+  if (addr % DramParams::kGranule != 0) fail("address not 16-byte aligned");
   if (size > p_.burst_bytes) fail("larger than burst_bytes");
   if (addr / p_.row_bytes != (addr + size - 1) / p_.row_bytes) fail("crosses a row");
   if (addr + size > p_.capacity_bytes) fail("beyond capacity");
@@ -43,7 +45,11 @@ void DramTiming::check_legal(std::uint64_t addr, std::uint64_t size) const {
 DramSchedule DramTiming::schedule(Cycle accept, std::uint64_t addr, std::uint64_t size) {
   check_legal(addr, size);
   const DramAddr a = map(addr);
-  const Cycle d = size / p_.bus_bytes_per_cycle;
+  // Bus beats the request touches: a request narrower than the bus, or not
+  // bus-aligned, still occupies whole beats (masked/partial beats). With
+  // W = 16 this is size / 16 exactly, as in Phase 1 (docs/BUGS.md #8).
+  const std::uint64_t w = p_.bus_bytes_per_cycle;
+  const Cycle d = (addr + size - 1) / w - addr / w + 1;
 
   DramSchedule s{};
   s.bank = a.bank;

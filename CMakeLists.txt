@@ -39,6 +39,9 @@ add_library(apm_core
   src/pe/lmem_alloc.cpp
   src/pe/gemm_layout.cpp
   src/pe/pe_config.cpp
+  src/noc/mesh_timing.cpp
+  src/soc/soc_plan.cpp
+  src/soc/stall.cpp
 )
 target_include_directories(apm_core PUBLIC src)
 
@@ -52,6 +55,9 @@ add_library(apm_model
   src/test/traffic_gen.cpp
   src/test/scenarios.cpp
   src/test/gemm_run.cpp
+  src/noc/mesh.cpp
+  src/soc/accel.cpp
+  src/soc/accel_run.cpp
 )
 target_link_libraries(apm_model PUBLIC apm_core SystemC::systemc)
 
@@ -59,6 +65,8 @@ add_executable(apm_scenario tools/apm_scenario.cpp)
 target_link_libraries(apm_scenario PRIVATE apm_model)
 add_executable(apm_gemm tools/apm_gemm.cpp)
 target_link_libraries(apm_gemm PRIVATE apm_model)
+add_executable(apm_accel tools/apm_accel.cpp)
+target_link_libraries(apm_accel PRIVATE apm_model)
 # Standalone functional reference: deliberately links nothing from the model.
 add_executable(gemm_ref tools/gemm_ref.cpp)
 
@@ -71,13 +79,17 @@ add_executable(unit_tests
   tests/unit/rr_arbiter_test.cpp
   tests/unit/systolic_test.cpp
   tests/unit/pe_config_test.cpp
+  tests/unit/mesh_timing_test.cpp
+  tests/unit/stall_test.cpp
+  tests/unit/soc_plan_test.cpp
 )
 target_link_libraries(unit_tests PRIVATE apm_core GTest::gtest_main)
 gtest_discover_tests(unit_tests TEST_PREFIX "unit." PROPERTIES LABELS unit)
 
 # SystemC cannot be re-elaborated in one process. gtest_discover_tests runs
 # every test case in its own process, which is exactly what we need.
-add_executable(sim_tests tests/sim/main.cpp tests/sim/scenarios_test.cpp tests/sim/phase2_test.cpp)
+add_executable(sim_tests tests/sim/main.cpp tests/sim/scenarios_test.cpp tests/sim/phase2_test.cpp
+  tests/sim/phase3_test.cpp)
 target_link_libraries(sim_tests PRIVATE apm_model GTest::gtest)
 gtest_discover_tests(sim_tests TEST_PREFIX "sim."
   PROPERTIES LABELS sim ENVIRONMENT "SYSTEMC_DISABLE_COPYRIGHT_MESSAGE=1")
@@ -85,9 +97,14 @@ gtest_discover_tests(sim_tests TEST_PREFIX "sim."
 # Determinism (rule 5): the same scenario, run twice in separate processes,
 # must print byte-identical JSON.
 add_test(NAME determinism.t2
-  COMMAND ${CMAKE_COMMAND} -DEXE=$<TARGET_FILE:apm_scenario> -DSCENARIO=t2
+  COMMAND ${CMAKE_COMMAND} -DEXE=$<TARGET_FILE:apm_scenario> -DARGS=t2
           -P ${CMAKE_SOURCE_DIR}/tests/determinism.cmake)
-set_tests_properties(determinism.t2 PROPERTIES LABELS determinism
+# Phase 3: a 2x3 grid with contention on every resource.
+add_test(NAME determinism.accel
+  COMMAND ${CMAKE_COMMAND} -DEXE=$<TARGET_FILE:apm_accel>
+          "-DARGS=M=16;N=96;K=256;R=4;C=16;Kt=64;px=2;py=3;sram_x=1;sram_y=1;seed=3"
+          -P ${CMAKE_SOURCE_DIR}/tests/determinism.cmake)
+set_tests_properties(determinism.t2 determinism.accel PROPERTIES LABELS determinism
   ENVIRONMENT "SYSTEMC_DISABLE_COPYRIGHT_MESSAGE=1")
 
 # Functional match (Phase 2 rule 4): random INT8 GEMMs, model vs NumPy vs the
@@ -97,3 +114,7 @@ add_test(NAME functional.gemm20
   COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/python/gemm_check.py
           --apm-gemm $<TARGET_FILE:apm_gemm> --gemm-ref $<TARGET_FILE:gemm_ref> --cases 20)
 set_tests_properties(functional.gemm20 PROPERTIES LABELS functional)
+add_test(NAME functional.accel20
+  COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/python/gemm_check.py --target accel
+          --apm-accel $<TARGET_FILE:apm_accel> --gemm-ref $<TARGET_FILE:gemm_ref> --cases 20)
+set_tests_properties(functional.accel20 PROPERTIES LABELS functional)

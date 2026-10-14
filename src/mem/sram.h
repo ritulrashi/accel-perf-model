@@ -14,7 +14,7 @@ class Sram : public SampledTarget {
   void report(std::map<std::string, std::uint64_t>& out) const override;
 
  protected:
-  bool accept(const tlm::tlm_generic_payload& trans, Cycle accept, Cycle& response) override;
+  bool accept(const tlm::tlm_generic_payload& trans, Cycle accept, AcceptInfo& info) override;
 
  private:
   SramTiming timing_;

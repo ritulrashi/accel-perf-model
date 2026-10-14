@@ -10,11 +10,12 @@ void DramChannel::begin_sample(Cycle c) {
   while (!in_queue_.empty() && in_queue_.top() <= c) in_queue_.pop();
 }
 
-bool DramChannel::accept(const tlm::tlm_generic_payload& trans, Cycle accept, Cycle& response) {
+bool DramChannel::accept(const tlm::tlm_generic_payload& trans, Cycle accept, AcceptInfo& info) {
   if (in_queue_.size() >= timing_.params().queue_depth) return false;
   const DramSchedule s = timing_.schedule(accept, trans.get_address(), trans.get_data_length());
-  response = s.data_end;
-  in_queue_.push(response);
+  info.response = s.data_end;
+  info.cat = StallCat::Dram;
+  in_queue_.push(info.response);
   (trans.is_read() ? bytes_read_ : bytes_written_) += trans.get_data_length();
   return true;
 }

@@ -1,5 +1,7 @@
 #include "mem/sampled_target.h"
 
+#include "common/trace_ext.h"
+
 #include <cstring>
 #include <stdexcept>
 #include <string>
@@ -27,6 +29,7 @@ SampledTarget::SampledTarget(sc_core::sc_module_name name, std::uint64_t capacit
 
 void SampledTarget::end_of_elaboration() {
   pending_.assign(socket.size(), nullptr);
+  arrived_.assign(socket.size(), 0);
   if (socket.size() > 0) arbiter_ = std::make_unique<RrArbiter>(socket.size());
 }
 
@@ -50,6 +53,7 @@ tlm_sync_enum SampledTarget::nb_transport_fw(int port, tlm_generic_payload& tran
   require(pending_[port] == nullptr, "SampledTarget: BEGIN_REQ before END_REQ on the same port");
   require(trans.get_byte_enable_ptr() == nullptr, "SampledTarget: byte enables not supported");
   pending_[port] = &trans;
+  arrived_[port] = now_cycle();
   // Several notifications for the same sample point collapse into one.
   sample_ev_.notify(until_sample(now_cycle()));
   return tlm::TLM_ACCEPTED;
@@ -90,12 +94,17 @@ void SampledTarget::sample_proc() {
   for (unsigned port : arbiter_->order()) {
     tlm_generic_payload* trans = pending_[port];
     if (trans == nullptr) continue;
-    Cycle response = 0;
-    if (!accept(*trans, c, response)) {
+    AcceptInfo info;
+    if (!accept(*trans, c, info)) {
       ++still_pending;
       continue;
     }
+    const Cycle response = info.response;
     require(response > c, "SampledTarget: response not after acceptance");
+    require(info.conflict < response - c, "SampledTarget: conflict longer than residency");
+    add_trace(*trans, arrived_[port], c, info.cat);  // refused acceptance (backpressure)
+    add_trace(*trans, c, c + info.conflict, StallCat::SramConflict);
+    add_trace(*trans, c + info.conflict, response, info.cat);
     if (!granted_any) first_granted = port;
     granted_any = true;
     pending_[port] = nullptr;

@@ -23,10 +23,11 @@ std::uint64_t round_up(std::uint64_t x, std::uint64_t to) { return (x + to - 1) 
 class GemmTop : public sc_core::sc_module {
  public:
   DramChannel dram;
+  DramGemmJob job;  // declared before pe: the PE keeps a reference
   Pe pe;
 
   GemmTop(sc_core::sc_module_name name, const DramParams& d, const PeConfig& p, const GemmLayout& l)
-      : sc_module(name), dram("dram", d), pe("pe", p, l) {
+      : sc_module(name), dram("dram", d), job(l), pe("pe", p, job) {
     pe.dma.dram_socket.bind(dram.socket);
   }
 };
