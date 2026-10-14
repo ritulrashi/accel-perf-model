@@ -87,15 +87,17 @@ def op_formulas(prog, hw, op):
                 dram_bound=b["dram"], noc_bound=Fraction(0))
 
 
-def run_one(s, tools, failures):
-    hw = dict(attn.HW_A4)
+def run_one(s, tools, failures, hw=None):
+    """One study program; hw (Phase 5 sweeps) overrides the A4 configuration."""
+    hw = dict(attn.HW_A4 if hw is None else hw)
     hw["V"] = s["V"]
     spec = s["spec"]
     prog = attn.lower(spec, hw)
     out = attn.run_attention(spec, hw, tools, check=True, fp64=True)
     row = dict(id=s["id"], group=s["group"], mode=spec["mode"], L=spec.get("L", ""), T=spec.get("T", ""),
                g=spec.get("g", ""), d=spec["d"], prec=spec["prec"], p_scale=spec["p_scale"] if spec["prec"] == "int8" else "",
-               mapping="1x4" if (spec["mode"] == "decode" and spec["mapping"] == "auto") else "2x2", V=hw["V"],
+               mapping=(f"1x{hw['px'] * hw['py']}" if (spec["mode"] == "decode" and spec["mapping"] == "auto")
+                        else f"{hw['px']}x{hw['py']}"), V=hw["V"],
                t_program=out["t_program"], useful_ops=out["useful_ops"], dram_bytes=out["dram_bytes"],
                achieved=f"{out['useful_ops'] / out['t_program']:.4f}",
                ai=f"{out['useful_ops'] / out['dram_bytes']:.4f}",

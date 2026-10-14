@@ -1,0 +1,11 @@
+# HT2, written by hand from the contract: chunk c at f_c, MAC(i,j,k) in cycle f_c + (k - c*Kt) + i + j;
+# cells 00 01 10 11; last MAC 3+2+2+2-3 = 6; drain [7,9) row 1 then row 0.
+0 mac 0 . . . drain -
+1 mac 1 0 0 . drain -
+2 mac . 1 1 0 drain -
+3 mac 2 . . 1 drain -
+4 mac 3 2 2 . drain -
+5 mac . 3 3 2 drain -
+6 mac . . . 3 drain -
+7 mac . . . . drain 1
+8 mac . . . . drain 0

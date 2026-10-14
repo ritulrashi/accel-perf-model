@@ -58,6 +58,14 @@ const std::map<std::string, Spec>& specs() {
     s["t4b"].tg_dram = {{rd(0, 0, 64), rd(100, 4096, 64)}};
     s["t4c"].tg_dram = {{rd(0, 0, 64), rd(1, 4096, 64)}};
     s["t4d"].tg_dram = {{rd(0, 0, 64), rd(1, 1024, 64)}};
+    // Phase 5 §6: the xor bank map (Phase 1 DRAM configuration otherwise).
+    s["t5a"].tg_dram = {{rd(0, 0, 64), rd(1, 4096, 64)}};
+    s["t5a"].dram.bank_map = BankMap::Xor;
+    s["t5b"].tg_dram = {{rd(0, 0, 64), rd(1, 5120, 64)}};
+    s["t5b"].dram.bank_map = BankMap::Xor;
+    s["t5c"].tg_dram = {{wr(0, 0, 64), wr(1, 4096, 64), wr(2, 8192, 64), wr(3, 12288, 64)}};
+    s["t5d"].tg_dram = s["t5c"].tg_dram;
+    s["t5d"].dram.bank_map = BankMap::Xor;
     s["f2d_d2s"].dma_descs = {TileDesc{DmaDir::DramToSram, 0, 0, 4, 128, 1024, 256}};
     s["f2d_s2d"].dma_descs = {TileDesc{DmaDir::SramToDram, 0, 8192, 4, 128, 256, 1024}};
     // Phase 2 P2-T6: two descriptors stream back to back through one DMA

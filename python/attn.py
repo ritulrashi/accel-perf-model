@@ -38,14 +38,14 @@ ATTN_STREAM = 4
 
 # The A4 reference configuration (design note §8.4).
 HW_A4 = dict(px=2, py=2, R=16, C=16, Kt=64, nbuf=2, nout=2, D=2, sram_x=0, sram_y=0,
-             dram_w=64, t_hit=10, t_miss=30, dram_q=32, dram_banks=4, dram_row=1024,
+             dram_w=64, t_hit=10, t_miss=30, dram_q=32, dram_banks=4, dram_row=1024, dram_map="row",
              gdma_m=32, pe_dma_m=8, sram_banks=16, hop=2, link=64,
              V=64, t_vu=4, vbuf=2, vout=2, vu_dma_m=32, vmem_banks=16)
 
 GEMM_HW_KEYS = ("R", "C", "Kt", "px", "py", "sram_x", "sram_y", "D", "nbuf", "nout", "hop", "link",
                 "sram_banks", "gdma_m", "pe_dma_m")
 VU_HW_KEYS = ("V", "t_vu", "vbuf", "vout", "vmem_banks", "vu_dma_m")
-DRAM_HW_KEYS = ("dram_w", "t_hit", "t_miss", "dram_q", "dram_banks", "dram_row")
+DRAM_HW_KEYS = ("dram_w", "t_hit", "t_miss", "dram_q", "dram_banks", "dram_row", "dram_map")
 GEMM_CATS = ("compute", "dram", "sram_conflict", "network", "dma", "idle")
 VU_CATS = ("busy", "load", "store")
 
@@ -204,14 +204,17 @@ def op_args(op, prog, hw):
     return args
 
 
-def run_program(prog, img, hw, tools, work):
-    """Runs every op in order; returns (per-op results, final image)."""
+def run_program(prog, img, hw, tools, work, schedule_dir=None):
+    """Runs every op in order; returns (per-op results, final image).
+    schedule_dir (Phase 5): GEMM ops write their PE feed schedules to <dir>/<op>.sched."""
     env = dict(os.environ, SYSTEMC_DISABLE_COPYRIGHT_MESSAGE="1")
     path_in, path_out = os.path.join(work, "img_in.bin"), os.path.join(work, "img_out.bin")
     img.tofile(path_in)
     results = []
     for op in prog["ops"]:
         cmd = [os.path.join(tools, "apm_op")] + op_args(op, prog, hw) + [f"img={path_in}", f"out_img={path_out}"]
+        if schedule_dir and op["op"] == "gemm":
+            cmd.append(f"schedule={os.path.join(schedule_dir, op['name'] + '.sched')}")
         p = subprocess.run(cmd, capture_output=True, text=True, env=env)
         if p.returncode != 0:
             raise RuntimeError(f"apm_op {op['name']} failed ({p.returncode}): {p.stderr.strip()}")
@@ -318,7 +321,7 @@ def compare(model, rep, ref, writes_scales):
     return out
 
 
-def run_attention(spec, hw=None, tools="build/release", check=False, fp64=True):
+def run_attention(spec, hw=None, tools="build/release", check=False, fp64=True, schedule_dir=None):
     hw = dict(HW_A4 if hw is None else hw)
     prog = lower(spec, hw)
     prog["hw"] = hw
@@ -326,7 +329,7 @@ def run_attention(spec, hw=None, tools="build/release", check=False, fp64=True):
     prog["alpha_bits"] = inp["alpha_bits"]
     with tempfile.TemporaryDirectory() as work:
         img = build_image(prog, inp, hw)
-        results, final = run_program(prog, img, hw, tools, work)
+        results, final = run_program(prog, img, hw, tools, work, schedule_dir)
         model = extract(prog, final, hw)
         writes_scales = spec["prec"] == "int8" and spec.get("p_scale", "fixed") == "row"
         if spec["prec"] == "int8" and not writes_scales:  # fixed P scale: a constant, not stored

@@ -1,0 +1,9 @@
+# HT1, written by hand from the contract: MAC(i,j,k) in cycle k+i+j; cells 00 01 02 10 11 12;
+# drain [5,7) row 1 then row 0.
+0 mac 0 . . . . . drain -
+1 mac 1 0 . 0 . . drain -
+2 mac . 1 0 1 0 . drain -
+3 mac . . 1 . 1 0 drain -
+4 mac . . . . . 1 drain -
+5 mac . . . . . . drain 1
+6 mac . . . . . . drain 0

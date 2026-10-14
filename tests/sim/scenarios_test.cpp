@@ -143,6 +143,37 @@ TEST(Phase1, T4d_OtherBankBackToBack) {
   cycles(r, "tgd0.r1.response", 38);
 }
 
+// Phase 5 §6: bank-address map, hand-derived in docs/phase5-design.md.
+TEST(Phase5, T5a_XorMapSplitsT4c) {
+  const auto r = run_scenario("t5a");
+  ASSERT_TRUE(r.complete);
+  cycles(r, "tgd0.r0.response", 34);
+  cycles(r, "tgd0.r1.response", 38);
+}
+
+TEST(Phase5, T5b_XorMapPermutesConflicts) {
+  const auto r = run_scenario("t5b");
+  ASSERT_TRUE(r.complete);
+  cycles(r, "tgd0.r0.response", 34);
+  cycles(r, "tgd0.r1.response", 58);
+}
+
+TEST(Phase5, T5c_StrideOfFourRowsRowMap) {
+  const auto r = run_scenario("t5c");
+  ASSERT_TRUE(r.complete);
+  cycles(r, "tgd0.r1.response", 58);
+  cycles(r, "tgd0.r2.response", 82);
+  cycles(r, "tgd0.r3.response", 106);
+}
+
+TEST(Phase5, T5d_StrideOfFourRowsXorMap) {
+  const auto r = run_scenario("t5d");
+  ASSERT_TRUE(r.complete);
+  cycles(r, "tgd0.r1.response", 38);
+  cycles(r, "tgd0.r2.response", 42);
+  cycles(r, "tgd0.r3.response", 46);
+}
+
 TEST(Phase1, F2D_DramToSramStrided) {
   const auto r = run_scenario("f2d_d2s");
   ASSERT_TRUE(r.complete);

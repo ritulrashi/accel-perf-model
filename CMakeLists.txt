@@ -50,6 +50,8 @@ add_library(apm_core
   src/vec/softmax.cpp
   src/vec/vu_plan.cpp
   src/vec/vu_stall.cpp
+  src/compute/schedule_io.cpp
+  src/compute/contract_trace.cpp
 )
 target_include_directories(apm_core PUBLIC src)
 
@@ -97,8 +99,10 @@ add_executable(unit_tests
   tests/unit/soc_plan_test.cpp
   tests/unit/numerics_test.cpp
   tests/unit/softmax_test.cpp
+  tests/unit/contract_trace_test.cpp
 )
 target_link_libraries(unit_tests PRIVATE apm_core GTest::gtest_main)
+target_compile_definitions(unit_tests PRIVATE APM_SOURCE_DIR="${CMAKE_SOURCE_DIR}")
 gtest_discover_tests(unit_tests TEST_PREFIX "unit." PROPERTIES LABELS unit)
 
 # SystemC cannot be re-elaborated in one process. gtest_discover_tests runs
@@ -143,3 +147,9 @@ add_test(NAME functional.attn10
   COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/python/attn_check.py
           --tools $<TARGET_FILE_DIR:apm_op> --cases 10)
 set_tests_properties(functional.accel_prec20 functional.attn10 PROPERTIES LABELS functional)
+
+# Phase 5 part A: SystemVerilog array, Verilator testbench, RTL tests.
+option(APM_RTL "Build the SystemVerilog array and its Verilator testbench (Phase 5)" ON)
+if(APM_RTL)
+  include(cmake/rtl.cmake)
+endif()

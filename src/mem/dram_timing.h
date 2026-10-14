@@ -11,6 +11,11 @@
 
 namespace apm {
 
+// Bank-address map (Phase 5 design note §6). Row: bank = row_index mod B
+// (Phases 1-4). Xor: bank = (row_index XOR row_index / B) mod B, B a power of
+// two. The row within the bank is row_index / B in both, so both are bijections.
+enum class BankMap : std::uint8_t { Row, Xor };
+
 struct DramParams {
   // Smallest legal request and its alignment (bytes). Requests need not be
   // bus-aligned; they occupy every W-byte beat they touch.
@@ -23,6 +28,7 @@ struct DramParams {
   unsigned queue_depth = 8;           // Q: accepted-but-not-responded requests
   std::uint64_t burst_bytes = 64;     // largest legal request
   std::uint64_t capacity_bytes = 1 << 20;
+  BankMap bank_map = BankMap::Row;
 
   void validate() const;  // throws std::invalid_argument
 };

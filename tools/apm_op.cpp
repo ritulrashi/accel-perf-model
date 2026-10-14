@@ -10,6 +10,8 @@
 //          [prec p_scale=fixed|row causal=0|1 q_off alpha_bits scale_base V t_vu vbuf vout
 //          vmem_banks vu_dma_m]
 //   common DRAM keys: dram_w (16) t_hit (10) t_miss (30) dram_q (8) dram_banks (4) dram_row (1024)
+//                     dram_map (row | xor; Phase 5)
+//   gemm only: schedule=FILE writes every PE's feed schedule (Phase 5, INT8)
 //
 // A and B of a GEMM must already be packed at a_base / b_base (Phase 2 §3.1
 // layout, e-byte elements); C is written row-major (valid rows) at c_base.
@@ -69,6 +71,11 @@ int sc_main(int argc, char** argv) {
     dram.t_hit = opt("t_hit", 10);
     dram.t_miss = opt("t_miss", 30);
     dram.queue_depth = u(opt("dram_q", 8));
+    {
+      const std::string m = str("dram_map", "row");
+      if (m != "row" && m != "xor") throw std::runtime_error("dram_map must be row or xor");
+      dram.bank_map = m == "xor" ? apm::BankMap::Xor : apm::BankMap::Row;
+    }
     const apm::Precision prec = apm::parse_precision(str("prec", "int8"));
     std::vector<std::uint8_t> image = read_file(kv.at("img"));
     const std::string op = str("op", "");
@@ -76,6 +83,7 @@ int sc_main(int argc, char** argv) {
     if (op == "gemm") {
       apm::AccelConfig cfg;
       cfg.dram = dram;
+      if (kv.count("schedule")) cfg.schedule_path = kv.at("schedule");
       apm::GridConfig& g = cfg.grid;
       g.pe.array = {u(num("R")), u(num("C"))};
       g.pe.kt = num("Kt");

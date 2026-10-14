@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <cstring>
+#include <fstream>
 #include <functional>
 #include <memory>
 #include <sstream>
@@ -60,6 +61,8 @@ AccelRunResult simulate(AccelConfig cfg, const GemmLayout& l,
 
   auto top = std::make_unique<Accel>("top", cfg, plan);
   preload(top->dram);
+  if (!cfg.schedule_path.empty())
+    for (auto& pe : top->pes) pe->capture_schedule(true);
 
   sc_core::sc_start(sc_core::sc_time::from_value(kMaxCycles * kPsPerCycle), sc_core::SC_EXIT_ON_STARVATION);
   require(!sc_core::sc_pending_activity(), "accelerator run did not finish within kMaxCycles");
@@ -69,6 +72,12 @@ AccelRunResult simulate(AccelConfig cfg, const GemmLayout& l,
   for (const auto& pe : top->pes) r.complete = r.complete && pe->finished();
   if (!r.complete) throw std::logic_error("accelerator run ended incomplete (deadlock?)");
   r.t_end = top->sched.t_end();
+  if (!cfg.schedule_path.empty()) {
+    std::ofstream f(cfg.schedule_path);
+    for (unsigned p = 0; p < plan.pes(); ++p)
+      if (!plan.tiles_of(p).empty()) write_schedule(f, top->pes[p]->schedule(p));
+    if (!f) throw std::runtime_error("cannot write schedule " + cfg.schedule_path);
+  }
 
   // ---- stall stack
   const GridConfig& g = cfg.grid;

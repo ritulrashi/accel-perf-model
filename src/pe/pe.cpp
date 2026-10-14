@@ -73,6 +73,10 @@ void Pe::try_feed(Cycle now) {
   lmem.peek(a_buf_[buf], a.data(), a.size());
   lmem.peek(b_buf_[buf], b.data(), b.size());
   acc_.accumulate_bytes(a.data(), b.data(), cfg_.kt);
+  if (capture_) {
+    cap_a_[s] = a;
+    cap_b_[s] = b;
+  }
 
   if (c + 1 == job_.chunks()) {  // last chunk: the drain follows (Phase 2 §2.2)
     tile_done_at_ = tile_done(cfg_.array, now, cfg_.feed_cycles());
@@ -86,6 +90,7 @@ void Pe::finish_tile(Cycle now) {
   // The drain writes INT32 / FP32 results (little-endian, host order) into the output buffer.
   const std::vector<std::uint8_t> bytes = acc_.bytes();
   lmem.poke(out, bytes.data(), bytes.size());
+  if (capture_) cap_c_[t] = bytes;
   tile_in_array_ = false;
   drain_pending_ = false;
   tiles_[t].done = static_cast<std::int64_t>(now);
@@ -151,6 +156,33 @@ void Pe::act() {
     issue_loads(next_load_++, now);
   try_feed(now);
   arm_wake(now);
+}
+
+void Pe::capture_schedule(bool on) {
+  if (on && cfg_.prec != Precision::Int8)
+    throw std::invalid_argument("Pe: schedule capture is INT8 only (the RTL scope)");
+  if (on && cfg_.cycles_per_step() != 1) throw std::invalid_argument("Pe: schedule capture needs q = 1");
+  capture_ = on;
+  cap_a_.assign(job_.steps(), {});
+  cap_b_.assign(job_.steps(), {});
+  cap_c_.assign(job_.tiles(), {});
+}
+
+PeSchedule Pe::schedule(unsigned pe_id) const {
+  if (!capture_) throw std::logic_error("Pe: schedule requested without capture");
+  PeSchedule s;
+  s.pe = pe_id;
+  s.rows = cfg_.array.rows;
+  s.cols = cfg_.array.cols;
+  s.kt = cfg_.kt;
+  s.chunks = job_.chunks();
+  for (std::uint64_t i = 0; i < steps_.size(); ++i) {
+    if (steps_[i].feed < 0) throw std::logic_error("Pe: schedule of an unfinished run");
+    s.steps.push_back({i / job_.chunks(), i % job_.chunks(), static_cast<Cycle>(steps_[i].feed), cap_a_[i], cap_b_[i]});
+  }
+  for (std::uint64_t t = 0; t < tiles_.size(); ++t)
+    s.tiles.push_back({t, static_cast<Cycle>(tiles_[t].done), cap_c_[t]});
+  return s;
 }
 
 void Pe::report(std::map<std::string, std::uint64_t>& out) const {

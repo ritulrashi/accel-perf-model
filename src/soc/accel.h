@@ -97,6 +97,8 @@ class GridJob : public PeJob {
 struct AccelConfig {
   DramParams dram;
   GridConfig grid;
+  // Phase 5 (design note §3.1): non-empty = write every PE's feed schedule here.
+  std::string schedule_path;
 };
 
 class Accel : public sc_core::sc_module {

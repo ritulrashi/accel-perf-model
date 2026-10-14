@@ -11,6 +11,7 @@
 // what the plan needs), gdma_m, pe_dma_m (8, 8).
 // Phase 4: prec (int8 | fp16 | bf16 | fp32, default int8), q (0 = e),
 // m_valid (0 = M), px_map, py_map (logical mapping, 0 = physical).
+// Phase 5: dram_map (row | xor), schedule=FILE (every PE's feed schedule).
 // a/b files hold row-major e-byte elements of the precision; C is written as
 // 4-byte words (INT32, or FP32 bits).
 // Without a/b files the operands are pseudo-random from `seed` (default 1);
@@ -111,6 +112,10 @@ int sc_main(int argc, char** argv) {
     g.px_map = u(opt("px_map", 0));
     g.py_map = u(opt("py_map", 0));
     run.m_valid = opt("m_valid", 0);
+    if (kv.count("schedule")) run.cfg.schedule_path = kv.at("schedule");
+    if (kv.count("dram_map")) run.cfg.dram.bank_map = kv.at("dram_map") == "xor" ? apm::BankMap::Xor : apm::BankMap::Row;
+    if (kv.count("dram_map") && kv.at("dram_map") != "xor" && kv.at("dram_map") != "row")
+      throw std::runtime_error("dram_map must be row or xor");
     run.cfg.dram.bus_bytes_per_cycle = u(opt("dram_w", 16));
     run.cfg.dram.t_hit = opt("t_hit", 10);
     run.cfg.dram.t_miss = opt("t_miss", 30);

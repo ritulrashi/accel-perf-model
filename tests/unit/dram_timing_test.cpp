@@ -3,7 +3,9 @@
 // tests (tests/sim) check that the TLM plumbing produces those accept cycles.
 #include <gtest/gtest.h>
 
+#include <set>
 #include <stdexcept>
+#include <utility>
 
 #include "mem/dram_timing.h"
 
@@ -130,3 +132,23 @@ TEST(DramTiming, PartialBeatsOnAWideBus) {
   EXPECT_EQ(t.bus_busy_cycles(), 3u);
 }
 
+
+// Phase 5 §6: the xor map. Hand rows: row index 4m -> bank m mod 4; 5 -> bank 0.
+TEST(DramTiming, XorMapHandRowsAndBijection) {
+  DramParams p;
+  p.bank_map = apm::BankMap::Xor;
+  p.capacity_bytes = 1ull << 32;
+  DramTiming t{p};
+  for (unsigned m = 0; m < 8; ++m) EXPECT_EQ(t.map(4096ull * m).bank, m % 4) << m;
+  EXPECT_EQ(t.map(5120).bank, 0u);
+  EXPECT_EQ(t.map(5120).row, 1u);
+  // Bijection on 4096 row indices: (bank, row) pairs are all distinct and invert.
+  std::set<std::pair<unsigned, std::uint64_t>> seen;
+  for (std::uint64_t ri = 0; ri < 4096; ++ri) {
+    const auto a = t.map(ri * p.row_bytes);
+    EXPECT_TRUE(seen.insert({a.bank, a.row}).second) << ri;
+    EXPECT_EQ(a.row * p.banks + (a.bank ^ (a.row % p.banks)), ri);
+  }
+  p.banks = 3;
+  EXPECT_THROW(p.validate(), std::invalid_argument);
+}

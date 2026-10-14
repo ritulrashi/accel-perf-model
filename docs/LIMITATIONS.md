@@ -165,3 +165,28 @@ What this project does **not** model or verify. Updated every phase.
 - **Numerics use N(0,1) random inputs.** Real activations have outliers and
   structure (attention sinks, peaked rows). INT8 accuracy on real models can
   be far worse or better than measured here.
+
+## RTL correlation, bank map, sweeps (Phase 5)
+- **The RTL covers only the compute array:** INT8, q = 1, output-stationary,
+  one accumulator set. The PE controller, DMA, LMEM, mesh and DRAM have no
+  RTL. The array is driven by the schedules the model's controllers
+  produced, so correlation shows that the array honours the contract for
+  those schedules. It does not show that the controller's timing is right
+  (that rests on the Phase 2–4 hand derivations).
+- **Simulated, not synthesized:** there is no timing closure, area, power or
+  frequency. "Correlation" means cycle-behaviour equivalence (tile timing,
+  values, per-cell MAC per cycle) and nothing more.
+- **Coverage:** 14 array shapes up to 16×16 (8×32), with schedules from the
+  Phase 2/3 random GEMMs and four A4 attention GEMM ops. Bubble patterns are
+  only those the model's controllers generate. Only two schedules (HT1, HT2)
+  are hand-written.
+- **Same author for contract, model and RTL.** The hand traces and the
+  Phase 2 hand-derived done cycles are the only checks independent of both
+  implementations.
+- **DRAM:** the XOR bank map is the only controller-side remedy modelled,
+  and it needs a power-of-two bank count. The controller is still in-order
+  FCFS, with no reordering (FR-FCFS), no write buffering and no bank-aware
+  scheduling.
+- **Sweeps:** each point is a single configuration (A4 timing parameters,
+  W = 64, mesh L = 64, SRAM at the corner, 1024 MACs in S2). The results rank
+  arrangements of this model under these parameters, not real designs.

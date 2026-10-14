@@ -18,6 +18,8 @@ void DramParams::validate() const {
     throw std::invalid_argument("DramParams: burst_bytes must be a multiple of the bus width");
   if (row_bytes % burst_bytes != 0)
     throw std::invalid_argument("DramParams: row_bytes must be a multiple of burst_bytes");
+  if (bank_map == BankMap::Xor && (banks & (banks - 1)) != 0)
+    throw std::invalid_argument("DramParams: the xor bank map needs a power-of-two bank count");
 }
 
 DramTiming::DramTiming(const DramParams& p)
@@ -27,7 +29,9 @@ DramTiming::DramTiming(const DramParams& p)
 
 DramAddr DramTiming::map(std::uint64_t addr) const {
   const std::uint64_t row_index = addr / p_.row_bytes;
-  return {static_cast<unsigned>(row_index % p_.banks), row_index / p_.banks};
+  const std::uint64_t row = row_index / p_.banks;
+  const std::uint64_t bank = p_.bank_map == BankMap::Xor ? (row_index ^ row) % p_.banks : row_index % p_.banks;
+  return {static_cast<unsigned>(bank), row};
 }
 
 void DramTiming::check_legal(std::uint64_t addr, std::uint64_t size) const {

@@ -5,7 +5,7 @@
 //
 // Optional keys (defaults are the library defaults): nbuf, nout,
 // lmem_bytes (0 = exactly what the buffers need), dram_w, t_hit, t_miss,
-// dram_q, dma_m.
+// dram_q, dma_m; schedule=FILE (Phase 5: write the PE's feed schedule).
 // A.bin is M*K int8 row-major, B.bin is K*N int8 row-major.
 #include <systemc>
 
@@ -66,6 +66,7 @@ int sc_main(int argc, char** argv) {
     run.pe.lmem.capacity_bytes = lmem ? lmem : run.pe.lmem_required();
     run.a = read_i8(kv.at("a"), run.shape.m * run.shape.k);
     run.b = read_i8(kv.at("b"), run.shape.k * run.shape.n);
+    if (kv.count("schedule")) run.schedule_path = kv.at("schedule");
 
     const apm::GemmRunResult r = apm::run_gemm(run);
     std::ofstream out(kv.at("out"), std::ios::binary);

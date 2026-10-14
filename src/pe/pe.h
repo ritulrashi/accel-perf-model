@@ -24,6 +24,7 @@
 #include <vector>
 
 #include "common/cycle.h"
+#include "compute/schedule_io.h"
 #include "compute/systolic.h"
 #include "dma/dma_engine.h"
 #include "mem/sram.h"
@@ -58,6 +59,12 @@ class Pe : public sc_core::sc_module {
   };
   const std::vector<StepRec>& step_records() const { return steps_; }
   const std::vector<TileRec>& tile_records() const { return tiles_; }
+
+  // Phase 5 (design note §3.1): keep the operand blocks each feed read and the
+  // values each drain wrote, so the schedule can be replayed into the RTL.
+  // INT8 only (the RTL scope). Call before sc_start.
+  void capture_schedule(bool on);
+  PeSchedule schedule(unsigned pe_id) const;
 
  private:
   enum class Kind { LoadA, LoadB, Store };
@@ -94,6 +101,8 @@ class Pe : public sc_core::sc_module {
   std::deque<std::uint64_t> store_q_;      // finished tiles whose store is not yet submitted
   std::uint64_t stores_done_ = 0;
   Cycle done_cycle_ = 0;
+  bool capture_ = false;
+  std::vector<std::vector<std::uint8_t>> cap_a_, cap_b_, cap_c_;
   sc_core::sc_event wake_now_, wake_timed_;
 };
 

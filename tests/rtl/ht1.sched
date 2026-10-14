@@ -1,0 +1,5 @@
+# HT1 (docs/phase5-design.md §3.4): R=2, C=3, Kt=2, one chunk fed at f=0.
+# A = [[1,2],[3,4]], B = [[1,0,-1],[2,1,0]], C = A*B = [[5,2,-1],[11,4,-3]]; done = 0 + 2 + 2*2 + 3 - 2 = 7.
+pe 0 R 2 C 3 Kt 2 nc 1
+step 0 tile 0 chunk 0 feed 0 a 01020304 b 0100ff020100
+tile 0 done 7 c 0500000002000000ffffffff0b00000004000000fdffffff

@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <cstring>
+#include <fstream>
 #include <memory>
 #include <sstream>
 #include <stdexcept>
@@ -71,6 +72,7 @@ GemmRunResult run_gemm(GemmRun run) {
   const auto pb = l.pack_b(run.b);
   top->dram.poke(l.a_base, pa.data(), pa.size());
   top->dram.poke(l.b_base, pb.data(), pb.size());
+  if (!run.schedule_path.empty()) top->pe.capture_schedule(true);
 
   sc_core::sc_start(sc_core::sc_time::from_value(kMaxCycles * kPsPerCycle),
                     sc_core::SC_EXIT_ON_STARVATION);
@@ -78,6 +80,11 @@ GemmRunResult run_gemm(GemmRun run) {
 
   GemmRunResult r;
   r.complete = top->pe.finished();
+  if (!run.schedule_path.empty()) {
+    std::ofstream f(run.schedule_path);
+    write_schedule(f, top->pe.schedule(0));
+    if (!f) throw std::runtime_error("cannot write schedule " + run.schedule_path);
+  }
   top->dram.report(r.values);
   top->pe.lmem.report(r.values);
   top->pe.dma.report(r.values);

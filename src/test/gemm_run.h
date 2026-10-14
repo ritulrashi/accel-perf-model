@@ -21,6 +21,7 @@ struct GemmRun {
   bool auto_layout = true;
   std::uint64_t a_base = 0, b_base = 0, c_base = 0;
   std::vector<std::int8_t> a, b;  // row-major M x K and K x N
+  std::string schedule_path;      // Phase 5: non-empty = write the PE's feed schedule here
 };
 
 struct GemmRunResult {
