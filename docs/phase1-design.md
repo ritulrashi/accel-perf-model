@@ -415,6 +415,7 @@ fail:
 | M5 | Arbiter always grants port 0 first (no RR) | T2 |
 | M6 | DMA frees a buffer at read response instead of write response | T1b |
 | M7 | DRAM ignores `bank_ready` (no per-bank occupancy) | T4c |
+| M8 | Targets drop write data (timing unchanged) | T1, T1c, both 2-D tests (data check) |
 
 A mutant that no test catches is a gap in the tests, and it gets a new test
 before Phase 1 is called done.
