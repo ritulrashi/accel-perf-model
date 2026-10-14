@@ -1,0 +1,122 @@
+# Phase 3 mutation check: do the tests, stall-stack assertions and functional checks detect injected bugs?
+command: scripts/phase3_mutation_check.sh
+
+## Provenance (of the unmutated tree the mutants were derived from)
+date_utc: 2026-10-14T08:49:46Z
+commit: 0d8ce617ed214c36d182c9df79ced7b2ca32c368
+tree: clean
+host: Linux 6.8.0-1064-azure x86_64
+os: Ubuntu 24.04.3 LTS
+lscpu:
+  Architecture:                            x86_64
+  CPU(s):                                  2
+  Model name:                              AMD EPYC 7763 64-Core Processor
+  Thread(s) per core:                      2
+  Core(s) per socket:                      1
+  Socket(s):                               1
+  L1d cache:                               32 KiB (1 instance)
+  L1i cache:                               32 KiB (1 instance)
+  L2 cache:                                512 KiB (1 instance)
+  L3 cache:                                32 MiB (1 instance)
+mem_total: 8132888 kB
+tools:
+  c++: c++ (Ubuntu 13.3.0-6ubuntu2~24.04) 13.3.0
+  cmake: cmake version 3.28.3
+  ninja: 1.11.1
+  systemc: 3.0.2 (release date 20251031) at /opt/systemc-3.0.2, commit 70b0fc8e4a74acc677b0fc73cea08f940c2115d5
+  googletest: 52eb8108c5bdec04579160ae17225d66034bd723  # v1.17.0
+  python3: Python 3.12.3
+  numpy: 1.26.4
+  verilator: Verilator 5.020 2024-01-01 rev (Debian 5.020-1)
+
+## Baseline (unmutated copy)
+ctest: tests passed, 0 tests failed out of 79
+failing tests: none
+
+## S1 (src/noc/mesh_timing.cpp)
+62:    const Cycle start = t;  // MUTANT S1 no link contention
+failing tests (4):
+  functional.accel20
+  sim.Phase3.T2_OneHopAndAnIdlePe
+  unit.MeshTiming.DownstreamLinkBusy
+  unit.MeshTiming.TwoPacketsShareALink
+required: sim.Phase3.T2_OneHopAndAnIdlePe unit.MeshTiming.TwoPacketsShareALink
+verdict: CAUGHT
+
+## S2 (src/noc/mesh_timing.cpp)
+65:    t = start;  // MUTANT S2 no hop latency
+failing tests (4):
+  sim.Phase3.T2_OneHopAndAnIdlePe
+  unit.MeshTiming.DownstreamLinkBusy
+  unit.MeshTiming.SinglePacketThreeHops
+  unit.MeshTiming.TwoPacketsShareALink
+required: sim.Phase3.T2_OneHopAndAnIdlePe unit.MeshTiming.SinglePacketThreeHops
+verdict: CAUGHT
+
+## S3 (src/common/trace.h)
+38:    if (s.from <= c && c < s.to) return s.cat == StallCat::Network ? StallCat::Dma : s.cat;  // MUTANT S3 mesh charged as dma
+failing tests (4):
+  sim.Phase3.T1_SinglePeAtSramNode
+  sim.Phase3.T2_OneHopAndAnIdlePe
+  unit.Stall.EveryCategoryOnHandTrace
+  unit.Stall.OutputBufferWaitFollowsTheBlockingStore
+required: sim.Phase3.T2_OneHopAndAnIdlePe
+verdict: CAUGHT
+
+## S4 (src/soc/stall.cpp)
+12:constexpr StallCat kIdle = StallCat::Dma;  // MUTANT S4 never idle
+failing tests (5):
+  sim.Phase3.T1_SinglePeAtSramNode
+  sim.Phase3.T2_OneHopAndAnIdlePe
+  unit.Stall.EveryCategoryOnHandTrace
+  unit.Stall.OutputBufferWaitFollowsTheBlockingStore
+  unit.Stall.UnsubmittedStagingIsIdle
+required: sim.Phase3.T1_SinglePeAtSramNode sim.Phase3.T2_OneHopAndAnIdlePe
+verdict: CAUGHT
+
+## S5 (src/soc/stall.cpp)
+14:constexpr StallCat kTail = StallCat::Idle;  // MUTANT S5 tail charged as idle
+failing tests (8):
+  determinism.accel
+  functional.accel20
+  sim.Phase3.T1_SinglePeAtSramNode
+  sim.Phase3.T2_OneHopAndAnIdlePe
+  sim.Phase3.T3_Grid2x2FunctionalAndDramBytes
+  unit.Stall.EveryCategoryOnHandTrace
+  unit.Stall.OutputBufferWaitFollowsTheBlockingStore
+  unit.Stall.UnsubmittedStagingIsIdle
+required: sim.Phase3.T3_Grid2x2FunctionalAndDramBytes
+verdict: CAUGHT
+
+## S6 (src/soc/accel.cpp)
+60:      { const std::size_t id2 = gdma.submit({DmaDir::DramToSram, blk.dram_addr, blk.sram_addr, 1, blk.bytes, blk.bytes, blk.bytes}); if (id2 >= desc_.size()) desc_.resize(id2 + 1); desc_[id2] = {true, next_q_, b}; }  staged_[next_q_][b].submit = static_cast<std::int64_t>(now);  // MUTANT S6 no dedup: block staged twice
+failing tests (5):
+  determinism.accel
+  functional.accel20
+  sim.Phase3.T1_SinglePeAtSramNode
+  sim.Phase3.T2_OneHopAndAnIdlePe
+  sim.Phase3.T3_Grid2x2FunctionalAndDramBytes
+required: sim.Phase3.T3_Grid2x2FunctionalAndDramBytes
+verdict: CAUGHT
+
+## S7 (src/soc/accel.cpp)
+28:  return q < d || blocks_left_[q - d] == 0;  /* MUTANT S7 slot freed when staged, not when consumed */
+failing tests (2):
+  functional.accel20
+  sim.Phase3.T3_Grid2x2FunctionalAndDramBytes
+  3-way summary: functional: target=accel seed=20261014 cases=20 all_three_agree=18 model_wrong=2 cpp_ref_wrong=0 extreme_cases=4
+required: functional.accel20
+verdict: CAUGHT
+
+## S8 (src/soc/soc_plan.cpp)
+79:  return slot * slot_bytes_ + t.y * l_.a_block_bytes();  // MUTANT S8 wrong A block
+failing tests (3):
+  functional.accel20
+  sim.Phase3.T3_Grid2x2FunctionalAndDramBytes
+  unit.SocPlan.TilesAndAddresses
+  3-way summary: functional: target=accel seed=20261014 cases=20 all_three_agree=12 model_wrong=8 cpp_ref_wrong=0 extreme_cases=4
+required: sim.Phase3.T3_Grid2x2FunctionalAndDramBytes functional.accel20
+verdict: CAUGHT
+
+## Result
+all mutants caught by their required tests: yes

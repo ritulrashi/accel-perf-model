@@ -1,0 +1,316 @@
+# Phase 3 exit criterion: accelerator grid, stall stack, roofline
+command: scripts/phase3_exit.sh
+
+## Provenance
+date_utc: 2026-10-14T08:46:40Z
+commit: 0d8ce617ed214c36d182c9df79ced7b2ca32c368
+tree: clean
+host: Linux 6.8.0-1064-azure x86_64
+os: Ubuntu 24.04.3 LTS
+lscpu:
+  Architecture:                            x86_64
+  CPU(s):                                  2
+  Model name:                              AMD EPYC 7763 64-Core Processor
+  Thread(s) per core:                      2
+  Core(s) per socket:                      1
+  Socket(s):                               1
+  L1d cache:                               32 KiB (1 instance)
+  L1i cache:                               32 KiB (1 instance)
+  L2 cache:                                512 KiB (1 instance)
+  L3 cache:                                32 MiB (1 instance)
+mem_total: 8132888 kB
+tools:
+  c++: c++ (Ubuntu 13.3.0-6ubuntu2~24.04) 13.3.0
+  cmake: cmake version 3.28.3
+  ninja: 1.11.1
+  systemc: 3.0.2 (release date 20251031) at /opt/systemc-3.0.2, commit 70b0fc8e4a74acc677b0fc73cea08f940c2115d5
+  googletest: 52eb8108c5bdec04579160ae17225d66034bd723  # v1.17.0
+  python3: Python 3.12.3
+  numpy: 1.26.4
+  verilator: Verilator 5.020 2024-01-01 rev (Debian 5.020-1)
+
+## Preset: asan
+### Expected vs measured (hand derivations: Phase 1 §6, Phase 2 §5, Phase 3 §5)
+count: F2D_DramToSramStrided dma0.d0.bursts expected=8 measured=8
+count: F2D_SramToDramStrided dma0.d0.bursts expected=8 measured=8
+count: T1_SinglePeAtSramNode pe0.stall.compute expected=86 measured=86
+count: T1_SinglePeAtSramNode pe0.stall.dma expected=27 measured=27
+count: T1_SinglePeAtSramNode pe0.stall.dram expected=52 measured=52
+count: T1_SinglePeAtSramNode pe0.stall.idle expected=20 measured=20
+count: T1_SinglePeAtSramNode pe0.stall.network expected=7 measured=7
+count: T1_SinglePeAtSramNode pe0.stall.sram_conflict expected=0 measured=0
+count: T1_SingleTransfer dma0.d0.bursts expected=4 measured=4
+count: T1_SingleTransfer dram.bus_busy_cycles expected=16 measured=16
+count: T1_SingleTransfer dram.row_hits expected=3 measured=3
+count: T1_SingleTransfer dram.row_misses expected=1 measured=1
+count: T1_SingleTransfer sram.conflict_line_cycles expected=0 measured=0
+count: T1c_ReverseDirection dram.bytes_written expected=256 measured=256
+count: T2_OneHopAndAnIdlePe pe0.stall.compute expected=86 measured=86
+count: T2_OneHopAndAnIdlePe pe0.stall.dma expected=49 measured=49
+count: T2_OneHopAndAnIdlePe pe0.stall.dram expected=52 measured=52
+count: T2_OneHopAndAnIdlePe pe0.stall.idle expected=20 measured=20
+count: T2_OneHopAndAnIdlePe pe0.stall.network expected=65 measured=65
+count: T2_OneHopAndAnIdlePe pe0.stall.sram_conflict expected=0 measured=0
+count: T2_OneHopAndAnIdlePe pe1.stall.compute expected=0 measured=0
+count: T2_OneHopAndAnIdlePe pe1.stall.dma expected=0 measured=0
+count: T2_OneHopAndAnIdlePe pe1.stall.dram expected=0 measured=0
+count: T2_OneHopAndAnIdlePe pe1.stall.idle expected=272 measured=272
+count: T2_OneHopAndAnIdlePe pe1.stall.network expected=0 measured=0
+count: T2_OneHopAndAnIdlePe pe1.stall.sram_conflict expected=0 measured=0
+count: T2_TwoDmasShareOneChannel dram.bus_busy_cycles expected=32 measured=32
+count: T2_TwoDmasShareOneChannel dram.row_hits expected=6 measured=6
+count: T2_TwoDmasShareOneChannel dram.row_misses expected=2 measured=2
+count: T2_TwoDmasShareOneChannel sram.conflict_line_cycles expected=0 measured=0
+count: T2b_QueueBackpressure dram.backpressure_cycles expected=35 measured=35
+count: T3_Grid2x2FunctionalAndDramBytes dram_bytes expected=24576 measured=24576
+count: T3_Grid2x2FunctionalAndDramBytes full_waves expected=1 measured=1
+count: T3a_SramBankConflict sram.conflict_line_cycles expected=1 measured=1
+count: T3b_SramNoConflict sram.conflict_line_cycles expected=0 measured=0
+count: T3c_SramIntraRequestSerialization sram.conflict_line_cycles expected=0 measured=0
+count: T4a_RowHit dram.row_hits expected=1 measured=1
+count: T4b_RowMiss dram.row_misses expected=2 measured=2
+cycles: T1_OneTileOneChunk pe.done expected=158 measured=158
+cycles: T1_OneTileOneChunk pe.s0.feed expected=52 measured=52
+cycles: T1_OneTileOneChunk pe.s0.loaded expected=52 measured=52
+cycles: T1_OneTileOneChunk pe.t0.done expected=138 measured=138
+cycles: T1_SinglePeAtSramNode t_end expected=192 measured=192
+cycles: T1_SingleTransfer dma0.d0.done expected=48 measured=48
+cycles: T1b_OneBufferIsLatencyBound dma0.d0.done expected=84 measured=84
+cycles: T1c_ReverseDirection dma0.d0.done expected=48 measured=48
+cycles: T2_DoubleBufferedComputeBound pe.done expected=350 measured=350
+cycles: T2_DoubleBufferedComputeBound pe.s0.feed expected=52 measured=52
+cycles: T2_DoubleBufferedComputeBound pe.s0.loaded expected=52 measured=52
+cycles: T2_DoubleBufferedComputeBound pe.s1.feed expected=116 measured=116
+cycles: T2_DoubleBufferedComputeBound pe.s1.loaded expected=92 measured=92
+cycles: T2_DoubleBufferedComputeBound pe.s2.feed expected=180 measured=180
+cycles: T2_DoubleBufferedComputeBound pe.s2.loaded expected=168 measured=168
+cycles: T2_DoubleBufferedComputeBound pe.s3.feed expected=244 measured=244
+cycles: T2_DoubleBufferedComputeBound pe.s3.loaded expected=232 measured=232
+cycles: T2_DoubleBufferedComputeBound pe.t0.done expected=330 measured=330
+cycles: T2_OneHopAndAnIdlePe t_end expected=272 measured=272
+cycles: T2_TwoDmasShareOneChannel dma0.d0.done expected=64 measured=64
+cycles: T2_TwoDmasShareOneChannel dma1.d0.done expected=60 measured=60
+cycles: T2b_QueueBackpressure dma0.d0.done expected=54 measured=54
+cycles: T3_SingleBuffer pe.done expected=506 measured=506
+cycles: T3_SingleBuffer pe.s0.feed expected=52 measured=52
+cycles: T3_SingleBuffer pe.s0.loaded expected=52 measured=52
+cycles: T3_SingleBuffer pe.s1.feed expected=168 measured=168
+cycles: T3_SingleBuffer pe.s1.loaded expected=168 measured=168
+cycles: T3_SingleBuffer pe.s2.feed expected=284 measured=284
+cycles: T3_SingleBuffer pe.s2.loaded expected=284 measured=284
+cycles: T3_SingleBuffer pe.s3.feed expected=400 measured=400
+cycles: T3_SingleBuffer pe.s3.loaded expected=400 measured=400
+cycles: T3_SingleBuffer pe.t0.done expected=486 measured=486
+cycles: T3a_SramBankConflict tgs0.r0.response expected=2 measured=2
+cycles: T3a_SramBankConflict tgs1.r0.response expected=3 measured=3
+cycles: T3b_SramNoConflict tgs0.r0.response expected=2 measured=2
+cycles: T3b_SramNoConflict tgs1.r0.response expected=2 measured=2
+cycles: T3c_SramIntraRequestSerialization tgs0.r0.response expected=3 measured=3
+cycles: T4_DoubleBufferedMemoryBound pe.done expected=446 measured=446
+cycles: T4_DoubleBufferedMemoryBound pe.s0.feed expected=92 measured=92
+cycles: T4_DoubleBufferedMemoryBound pe.s0.loaded expected=92 measured=92
+cycles: T4_DoubleBufferedMemoryBound pe.s1.feed expected=172 measured=172
+cycles: T4_DoubleBufferedMemoryBound pe.s1.loaded expected=172 measured=172
+cycles: T4_DoubleBufferedMemoryBound pe.s2.feed expected=252 measured=252
+cycles: T4_DoubleBufferedMemoryBound pe.s2.loaded expected=252 measured=252
+cycles: T4_DoubleBufferedMemoryBound pe.s3.feed expected=332 measured=332
+cycles: T4_DoubleBufferedMemoryBound pe.s3.loaded expected=332 measured=332
+cycles: T4_DoubleBufferedMemoryBound pe.t0.done expected=418 measured=418
+cycles: T4a_RowHit tgd0.r0.response expected=34 measured=34
+cycles: T4a_RowHit tgd0.r1.issued expected=100 measured=100
+cycles: T4a_RowHit tgd0.r1.response expected=114 measured=114
+cycles: T4b_RowMiss tgd0.r0.response expected=34 measured=34
+cycles: T4b_RowMiss tgd0.r1.issued expected=100 measured=100
+cycles: T4b_RowMiss tgd0.r1.response expected=134 measured=134
+cycles: T4c_SameBankBackToBack tgd0.r0.response expected=34 measured=34
+cycles: T4c_SameBankBackToBack tgd0.r1.issued expected=1 measured=1
+cycles: T4c_SameBankBackToBack tgd0.r1.response expected=58 measured=58
+cycles: T4d_OtherBankBackToBack tgd0.r0.response expected=34 measured=34
+cycles: T4d_OtherBankBackToBack tgd0.r1.issued expected=1 measured=1
+cycles: T4d_OtherBankBackToBack tgd0.r1.response expected=38 measured=38
+cycles: T5_TwoOutputTiles pe.done expected=244 measured=244
+cycles: T5_TwoOutputTiles pe.s0.feed expected=52 measured=52
+cycles: T5_TwoOutputTiles pe.s0.loaded expected=52 measured=52
+cycles: T5_TwoOutputTiles pe.s1.feed expected=138 measured=138
+cycles: T5_TwoOutputTiles pe.s1.loaded expected=92 measured=92
+cycles: T5_TwoOutputTiles pe.t0.done expected=138 measured=138
+cycles: T5_TwoOutputTiles pe.t0.store_done expected=158 measured=158
+cycles: T5_TwoOutputTiles pe.t1.done expected=224 measured=224
+cycles: T5b_OneOutputBuffer pe.done expected=264 measured=264
+cycles: T5b_OneOutputBuffer pe.s1.feed expected=158 measured=158
+cycles: T5b_OneOutputBuffer pe.t0.store_done expected=158 measured=158
+cycles: T5b_OneOutputBuffer pe.t1.done expected=244 measured=244
+cycles: T6_DmaStreamsAcrossDescriptors dma0.d0.done expected=20 measured=20
+cycles: T6_DmaStreamsAcrossDescriptors dma0.d1.done expected=28 measured=28
+cycles: T7_ExactCapacityStillRuns pe.done expected=158 measured=158
+### Mismatches
+none
+### Summary
+100% tests passed, 0 tests failed out of 79
+determinism    =   0.27 sec*proc (2 tests)
+functional     =   2.20 sec*proc (2 tests)
+sim            =   0.95 sec*proc (25 tests)
+unit           =   1.02 sec*proc (50 tests)
+determinism: M=16;N=96;K=256;R=4;C=16;Kt=64;px=2;py=3;sram_x=1;sram_y=1;seed=3 identical over 2 runs
+determinism: t2 identical over 2 runs
+ctest 20-case functional: target=pe seed=20261014 cases=20 all_three_agree=20 model_wrong=0 cpp_ref_wrong=0 extreme_cases=1
+ctest 20-case functional: target=accel seed=20261014 cases=20 all_three_agree=20 model_wrong=0 cpp_ref_wrong=0 extreme_cases=4
+failed tests: none
+
+## Preset: release
+### Expected vs measured (hand derivations: Phase 1 §6, Phase 2 §5, Phase 3 §5)
+count: F2D_DramToSramStrided dma0.d0.bursts expected=8 measured=8
+count: F2D_SramToDramStrided dma0.d0.bursts expected=8 measured=8
+count: T1_SinglePeAtSramNode pe0.stall.compute expected=86 measured=86
+count: T1_SinglePeAtSramNode pe0.stall.dma expected=27 measured=27
+count: T1_SinglePeAtSramNode pe0.stall.dram expected=52 measured=52
+count: T1_SinglePeAtSramNode pe0.stall.idle expected=20 measured=20
+count: T1_SinglePeAtSramNode pe0.stall.network expected=7 measured=7
+count: T1_SinglePeAtSramNode pe0.stall.sram_conflict expected=0 measured=0
+count: T1_SingleTransfer dma0.d0.bursts expected=4 measured=4
+count: T1_SingleTransfer dram.bus_busy_cycles expected=16 measured=16
+count: T1_SingleTransfer dram.row_hits expected=3 measured=3
+count: T1_SingleTransfer dram.row_misses expected=1 measured=1
+count: T1_SingleTransfer sram.conflict_line_cycles expected=0 measured=0
+count: T1c_ReverseDirection dram.bytes_written expected=256 measured=256
+count: T2_OneHopAndAnIdlePe pe0.stall.compute expected=86 measured=86
+count: T2_OneHopAndAnIdlePe pe0.stall.dma expected=49 measured=49
+count: T2_OneHopAndAnIdlePe pe0.stall.dram expected=52 measured=52
+count: T2_OneHopAndAnIdlePe pe0.stall.idle expected=20 measured=20
+count: T2_OneHopAndAnIdlePe pe0.stall.network expected=65 measured=65
+count: T2_OneHopAndAnIdlePe pe0.stall.sram_conflict expected=0 measured=0
+count: T2_OneHopAndAnIdlePe pe1.stall.compute expected=0 measured=0
+count: T2_OneHopAndAnIdlePe pe1.stall.dma expected=0 measured=0
+count: T2_OneHopAndAnIdlePe pe1.stall.dram expected=0 measured=0
+count: T2_OneHopAndAnIdlePe pe1.stall.idle expected=272 measured=272
+count: T2_OneHopAndAnIdlePe pe1.stall.network expected=0 measured=0
+count: T2_OneHopAndAnIdlePe pe1.stall.sram_conflict expected=0 measured=0
+count: T2_TwoDmasShareOneChannel dram.bus_busy_cycles expected=32 measured=32
+count: T2_TwoDmasShareOneChannel dram.row_hits expected=6 measured=6
+count: T2_TwoDmasShareOneChannel dram.row_misses expected=2 measured=2
+count: T2_TwoDmasShareOneChannel sram.conflict_line_cycles expected=0 measured=0
+count: T2b_QueueBackpressure dram.backpressure_cycles expected=35 measured=35
+count: T3_Grid2x2FunctionalAndDramBytes dram_bytes expected=24576 measured=24576
+count: T3_Grid2x2FunctionalAndDramBytes full_waves expected=1 measured=1
+count: T3a_SramBankConflict sram.conflict_line_cycles expected=1 measured=1
+count: T3b_SramNoConflict sram.conflict_line_cycles expected=0 measured=0
+count: T3c_SramIntraRequestSerialization sram.conflict_line_cycles expected=0 measured=0
+count: T4a_RowHit dram.row_hits expected=1 measured=1
+count: T4b_RowMiss dram.row_misses expected=2 measured=2
+cycles: T1_OneTileOneChunk pe.done expected=158 measured=158
+cycles: T1_OneTileOneChunk pe.s0.feed expected=52 measured=52
+cycles: T1_OneTileOneChunk pe.s0.loaded expected=52 measured=52
+cycles: T1_OneTileOneChunk pe.t0.done expected=138 measured=138
+cycles: T1_SinglePeAtSramNode t_end expected=192 measured=192
+cycles: T1_SingleTransfer dma0.d0.done expected=48 measured=48
+cycles: T1b_OneBufferIsLatencyBound dma0.d0.done expected=84 measured=84
+cycles: T1c_ReverseDirection dma0.d0.done expected=48 measured=48
+cycles: T2_DoubleBufferedComputeBound pe.done expected=350 measured=350
+cycles: T2_DoubleBufferedComputeBound pe.s0.feed expected=52 measured=52
+cycles: T2_DoubleBufferedComputeBound pe.s0.loaded expected=52 measured=52
+cycles: T2_DoubleBufferedComputeBound pe.s1.feed expected=116 measured=116
+cycles: T2_DoubleBufferedComputeBound pe.s1.loaded expected=92 measured=92
+cycles: T2_DoubleBufferedComputeBound pe.s2.feed expected=180 measured=180
+cycles: T2_DoubleBufferedComputeBound pe.s2.loaded expected=168 measured=168
+cycles: T2_DoubleBufferedComputeBound pe.s3.feed expected=244 measured=244
+cycles: T2_DoubleBufferedComputeBound pe.s3.loaded expected=232 measured=232
+cycles: T2_DoubleBufferedComputeBound pe.t0.done expected=330 measured=330
+cycles: T2_OneHopAndAnIdlePe t_end expected=272 measured=272
+cycles: T2_TwoDmasShareOneChannel dma0.d0.done expected=64 measured=64
+cycles: T2_TwoDmasShareOneChannel dma1.d0.done expected=60 measured=60
+cycles: T2b_QueueBackpressure dma0.d0.done expected=54 measured=54
+cycles: T3_SingleBuffer pe.done expected=506 measured=506
+cycles: T3_SingleBuffer pe.s0.feed expected=52 measured=52
+cycles: T3_SingleBuffer pe.s0.loaded expected=52 measured=52
+cycles: T3_SingleBuffer pe.s1.feed expected=168 measured=168
+cycles: T3_SingleBuffer pe.s1.loaded expected=168 measured=168
+cycles: T3_SingleBuffer pe.s2.feed expected=284 measured=284
+cycles: T3_SingleBuffer pe.s2.loaded expected=284 measured=284
+cycles: T3_SingleBuffer pe.s3.feed expected=400 measured=400
+cycles: T3_SingleBuffer pe.s3.loaded expected=400 measured=400
+cycles: T3_SingleBuffer pe.t0.done expected=486 measured=486
+cycles: T3a_SramBankConflict tgs0.r0.response expected=2 measured=2
+cycles: T3a_SramBankConflict tgs1.r0.response expected=3 measured=3
+cycles: T3b_SramNoConflict tgs0.r0.response expected=2 measured=2
+cycles: T3b_SramNoConflict tgs1.r0.response expected=2 measured=2
+cycles: T3c_SramIntraRequestSerialization tgs0.r0.response expected=3 measured=3
+cycles: T4_DoubleBufferedMemoryBound pe.done expected=446 measured=446
+cycles: T4_DoubleBufferedMemoryBound pe.s0.feed expected=92 measured=92
+cycles: T4_DoubleBufferedMemoryBound pe.s0.loaded expected=92 measured=92
+cycles: T4_DoubleBufferedMemoryBound pe.s1.feed expected=172 measured=172
+cycles: T4_DoubleBufferedMemoryBound pe.s1.loaded expected=172 measured=172
+cycles: T4_DoubleBufferedMemoryBound pe.s2.feed expected=252 measured=252
+cycles: T4_DoubleBufferedMemoryBound pe.s2.loaded expected=252 measured=252
+cycles: T4_DoubleBufferedMemoryBound pe.s3.feed expected=332 measured=332
+cycles: T4_DoubleBufferedMemoryBound pe.s3.loaded expected=332 measured=332
+cycles: T4_DoubleBufferedMemoryBound pe.t0.done expected=418 measured=418
+cycles: T4a_RowHit tgd0.r0.response expected=34 measured=34
+cycles: T4a_RowHit tgd0.r1.issued expected=100 measured=100
+cycles: T4a_RowHit tgd0.r1.response expected=114 measured=114
+cycles: T4b_RowMiss tgd0.r0.response expected=34 measured=34
+cycles: T4b_RowMiss tgd0.r1.issued expected=100 measured=100
+cycles: T4b_RowMiss tgd0.r1.response expected=134 measured=134
+cycles: T4c_SameBankBackToBack tgd0.r0.response expected=34 measured=34
+cycles: T4c_SameBankBackToBack tgd0.r1.issued expected=1 measured=1
+cycles: T4c_SameBankBackToBack tgd0.r1.response expected=58 measured=58
+cycles: T4d_OtherBankBackToBack tgd0.r0.response expected=34 measured=34
+cycles: T4d_OtherBankBackToBack tgd0.r1.issued expected=1 measured=1
+cycles: T4d_OtherBankBackToBack tgd0.r1.response expected=38 measured=38
+cycles: T5_TwoOutputTiles pe.done expected=244 measured=244
+cycles: T5_TwoOutputTiles pe.s0.feed expected=52 measured=52
+cycles: T5_TwoOutputTiles pe.s0.loaded expected=52 measured=52
+cycles: T5_TwoOutputTiles pe.s1.feed expected=138 measured=138
+cycles: T5_TwoOutputTiles pe.s1.loaded expected=92 measured=92
+cycles: T5_TwoOutputTiles pe.t0.done expected=138 measured=138
+cycles: T5_TwoOutputTiles pe.t0.store_done expected=158 measured=158
+cycles: T5_TwoOutputTiles pe.t1.done expected=224 measured=224
+cycles: T5b_OneOutputBuffer pe.done expected=264 measured=264
+cycles: T5b_OneOutputBuffer pe.s1.feed expected=158 measured=158
+cycles: T5b_OneOutputBuffer pe.t0.store_done expected=158 measured=158
+cycles: T5b_OneOutputBuffer pe.t1.done expected=244 measured=244
+cycles: T6_DmaStreamsAcrossDescriptors dma0.d0.done expected=20 measured=20
+cycles: T6_DmaStreamsAcrossDescriptors dma0.d1.done expected=28 measured=28
+cycles: T7_ExactCapacityStillRuns pe.done expected=158 measured=158
+### Mismatches
+none
+### Summary
+100% tests passed, 0 tests failed out of 79
+determinism    =   0.07 sec*proc (2 tests)
+functional     =   0.49 sec*proc (2 tests)
+sim            =   0.17 sec*proc (25 tests)
+unit           =   0.12 sec*proc (50 tests)
+determinism: M=16;N=96;K=256;R=4;C=16;Kt=64;px=2;py=3;sram_x=1;sram_y=1;seed=3 identical over 2 runs
+determinism: t2 identical over 2 runs
+ctest 20-case functional: target=pe seed=20261014 cases=20 all_three_agree=20 model_wrong=0 cpp_ref_wrong=0 extreme_cases=1
+ctest 20-case functional: target=accel seed=20261014 cases=20 all_three_agree=20 model_wrong=0 cpp_ref_wrong=0 extreme_cases=4
+failed tests: none
+
+## Functional match on the grid, 100 cases (release build)
+command: python3 python/gemm_check.py --target accel --apm-accel build/release/apm_accel --gemm-ref build/release/gemm_ref --cases 100 --csv results/phase3/functional_accel.csv
+exit status: 0
+functional: target=accel seed=20261014 cases=100 all_three_agree=100 model_wrong=0 cpp_ref_wrong=0 extreme_cases=11
+mismatching cases:
+  none
+
+## Sweep (release build)
+command: python3 python/sweep_p3.py --apm-accel build/release/apm_accel --out-dir results/phase3
+exit status: 0
+sweep wall time: 2 s
+sweep: configs=115 ran=115 failures=0 pe_cycles_classified=2778141 stall_sum_ok=115
+predicted regions: compute=37, dram=52, noc=26
+H2 compute: 34 of 37 have largest=compute; others {'idle': 2, 'dram': 1}
+H2 dram: 28 of 52 have dominant_noncompute=dram; others {'dma': 10, 'idle': 14}
+H2 noc: 12 of 26 have dominant_noncompute=network; others {'dram': 3, 'idle': 8, 'dma': 3}
+table41 / h5 rows:
+  id=0 table41 a=4 grid=2x2 sram=(0,0) W=64 L=64 t_end=5596 achieved=93.6898 peak=128.0000 dram_ceil=504.1231 noc_ceil=512.0000 predicted=compute eff_vs_attainable=0.7320 eff_vs_peak=0.7320 eff_vs_dram_ceil=0.1858 largest=compute dominant_noncompute=dram
+  id=1 table41 a=8 grid=2x2 sram=(0,0) W=16 L=64 t_end=10239 achieved=204.8200 peak=512.0000 dram_ceil=248.2424 noc_ceil=1024.0000 predicted=dram eff_vs_attainable=0.8251 eff_vs_peak=0.4000 eff_vs_dram_ceil=0.8251 largest=compute dominant_noncompute=dram
+  id=2 table41 a=8 grid=2x2 sram=(0,0) W=64 L=64 t_end=5836 achieved=359.3475 peak=512.0000 dram_ceil=992.9697 noc_ceil=1024.0000 predicted=compute eff_vs_attainable=0.7019 eff_vs_peak=0.7019 eff_vs_dram_ceil=0.3619 largest=compute dominant_noncompute=dma
+  id=3 table41 a=16 grid=2x2 sram=(0,0) W=64 L=16 t_end=16834 achieved=498.3134 peak=2048.0000 dram_ceil=1927.5294 noc_ceil=512.0000 predicted=noc eff_vs_attainable=0.9733 eff_vs_peak=0.2433 eff_vs_dram_ceil=0.2585 largest=network dominant_noncompute=network
+  id=4 table41 a=16 grid=2x2 sram=(0,0) W=64 L=64 t_end=8227 achieved=1019.6436 peak=2048.0000 dram_ceil=1927.5294 noc_ceil=2048.0000 predicted=dram eff_vs_attainable=0.5290 eff_vs_peak=0.4979 eff_vs_dram_ceil=0.5290 largest=compute dominant_noncompute=dma
+  id=5 h5_corner a=4 grid=3x3 sram=(0,0) W=64 L=16 t_end=12598 achieved=93.6377 peak=288.0000 dram_ceil=750.4122 noc_ceil=96.0000 predicted=noc eff_vs_attainable=0.9754 eff_vs_peak=0.3251 eff_vs_dram_ceil=0.1248 largest=network dominant_noncompute=network
+  id=6 h5_centre a=4 grid=3x3 sram=(1,1) W=64 L=16 t_end=8528 achieved=138.3265 peak=288.0000 dram_ceil=750.4122 noc_ceil=192.0000 predicted=noc eff_vs_attainable=0.7205 eff_vs_peak=0.4803 eff_vs_dram_ceil=0.1843 largest=compute dominant_noncompute=dram
+  id=7 h5_corner a=8 grid=3x3 sram=(0,0) W=64 L=16 t_end=25016 achieved=188.6230 peak=1152.0000 dram_ceil=1467.2239 noc_ceil=192.0000 predicted=noc eff_vs_attainable=0.9824 eff_vs_peak=0.1637 eff_vs_dram_ceil=0.1286 largest=network dominant_noncompute=network
+  id=8 h5_centre a=8 grid=3x3 sram=(1,1) W=64 L=16 t_end=12785 achieved=369.0725 peak=1152.0000 dram_ceil=1467.2239 noc_ceil=384.0000 predicted=noc eff_vs_attainable=0.9611 eff_vs_peak=0.3204 eff_vs_dram_ceil=0.2515 largest=network dominant_noncompute=network
+  id=9 h5_corner a=16 grid=3x3 sram=(0,0) W=64 L=16 t_end=49989 achieved=377.5704 peak=4608.0000 dram_ceil=2808.6857 noc_ceil=384.0000 predicted=noc eff_vs_attainable=0.9833 eff_vs_peak=0.0819 eff_vs_dram_ceil=0.1344 largest=network dominant_noncompute=network
+  id=10 h5_centre a=16 grid=3x3 sram=(1,1) W=64 L=16 t_end=25319 achieved=745.4626 peak=4608.0000 dram_ceil=2808.6857 noc_ceil=768.0000 predicted=noc eff_vs_attainable=0.9707 eff_vs_peak=0.1618 eff_vs_dram_ceil=0.2654 largest=network dominant_noncompute=network
+efficiency vs attainable over all runs: min=0.2246 median=0.6165 max=0.9847
