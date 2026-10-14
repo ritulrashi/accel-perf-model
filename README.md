@@ -15,7 +15,7 @@ configurable modelling parameter, not a datasheet value. See
 | Phase | Content | Design note | Status |
 |---|---|---|---|
 | 1 | Memory system: DRAM channel, banked SRAM, DMA | [docs/phase1-design.md](docs/phase1-design.md) | done: [exit criterion](results/phase1/exit_criterion.txt), [mutation check](results/phase1/mutation_check.txt) |
-| 2 | Compute unit, double buffering, functional reference | [docs/phase2-design.md](docs/phase2-design.md) | in progress |
+| 2 | Compute unit, double buffering, functional reference | [docs/phase2-design.md](docs/phase2-design.md) | done: [exit criterion](results/phase2/exit_criterion.txt), [functional cases](results/phase2/functional.csv), [mutation check](results/phase2/mutation_check.txt) |
 | 3 | Accelerator top, stall stack, roofline | — | not started |
 | 4 | Attention / GenAI workloads, precision modes | — | not started |
 | 5 | Microarchitecture sweeps, SystemVerilog correlation | — | not started |

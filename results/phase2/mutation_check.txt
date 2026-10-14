@@ -1,0 +1,136 @@
+# Phase 2 mutation check: do the timing tests and the functional comparison detect injected bugs?
+command: scripts/phase2_mutation_check.sh
+
+## Provenance (of the unmutated tree the mutants were derived from)
+date_utc: 2026-10-14T06:57:54Z
+commit: d730c59cb9a15e1d6c47aff9ea573cc470cbdb52
+tree: clean
+host: Linux 6.8.0-1064-azure x86_64
+os: Ubuntu 24.04.3 LTS
+lscpu:
+  Architecture:                            x86_64
+  CPU(s):                                  2
+  Model name:                              AMD EPYC 7763 64-Core Processor
+  Thread(s) per core:                      2
+  Core(s) per socket:                      1
+  Socket(s):                               1
+  L1d cache:                               32 KiB (1 instance)
+  L1i cache:                               32 KiB (1 instance)
+  L2 cache:                                512 KiB (1 instance)
+  L3 cache:                                32 MiB (1 instance)
+mem_total: 8132888 kB
+tools:
+  c++: c++ (Ubuntu 13.3.0-6ubuntu2~24.04) 13.3.0
+  cmake: cmake version 3.28.3
+  ninja: 1.11.1
+  systemc: 3.0.2 (release date 20251031) at /opt/systemc-3.0.2, commit 70b0fc8e4a74acc677b0fc73cea08f940c2115d5
+  googletest: 52eb8108c5bdec04579160ae17225d66034bd723  # v1.17.0
+  python3: Python 3.12.3
+  numpy: 1.26.4
+  verilator: Verilator 5.020 2024-01-01 rev (Debian 5.020-1)
+
+## Baseline (unmutated copy)
+ctest: tests passed, 0 tests failed out of 58
+failing tests: none
+
+## N1 (src/compute/systolic.h)
+28:inline Cycle fill_drain(const ArrayShape& a) { return a.rows + a.cols - 2; }  // MUTANT N1 no drain
+failing tests (9):
+  sim.Phase2.T1_OneTileOneChunk
+  sim.Phase2.T2_DoubleBufferedComputeBound
+  sim.Phase2.T3_SingleBuffer
+  sim.Phase2.T4_DoubleBufferedMemoryBound
+  sim.Phase2.T5_TwoOutputTiles
+  sim.Phase2.T5b_OneOutputBuffer
+  sim.Phase2.T7_ExactCapacityStillRuns
+  unit.Systolic.MacScheduleMatchesHandTable
+  unit.Systolic.TileLatencyFormula
+required: sim.Phase2.T1_OneTileOneChunk unit.Systolic.TileLatencyFormula
+verdict: CAUGHT
+
+## N2 (src/compute/systolic.cpp)
+21:      acc_[std::size_t{i} * a_.cols + j] = sum;  // MUTANT N2 overwrite
+failing tests (5):
+  functional.gemm20
+  sim.Phase2.T2_DoubleBufferedComputeBound
+  sim.Phase2.T3_SingleBuffer
+  sim.Phase2.T4_DoubleBufferedMemoryBound
+  unit.Systolic.AccumulateAddsAcrossChunks
+  3-way summary: functional: seed=20261014 cases=20 all_three_agree=8 model_wrong=12 cpp_ref_wrong=0 extreme_cases=1
+required: functional.gemm20
+verdict: CAUGHT
+
+## N3 (src/dma/dma_engine.cpp)
+100:      (to_read_.empty() or to_read_.front()->desc == 0 or results_[to_read_.front()->desc - 1].complete) and /* MUTANT N3 one descriptor at a time */ !to_read_.empty() && buffers_free_ > 0 && !busy(read_socket(*to_read_.front()));
+failing tests (8):
+  sim.Phase2.T1_OneTileOneChunk
+  sim.Phase2.T2_DoubleBufferedComputeBound
+  sim.Phase2.T3_SingleBuffer
+  sim.Phase2.T4_DoubleBufferedMemoryBound
+  sim.Phase2.T5_TwoOutputTiles
+  sim.Phase2.T5b_OneOutputBuffer
+  sim.Phase2.T6_DmaStreamsAcrossDescriptors
+  sim.Phase2.T7_ExactCapacityStillRuns
+required: sim.Phase2.T6_DmaStreamsAcrossDescriptors sim.Phase2.T2_DoubleBufferedComputeBound
+verdict: CAUGHT
+
+## N4 (src/pe/pe.cpp)
+61:  if (false) return;  // MUTANT N4 feed ignores loads
+failing tests (8):
+  functional.gemm20
+  sim.Phase2.T1_OneTileOneChunk
+  sim.Phase2.T2_DoubleBufferedComputeBound
+  sim.Phase2.T3_SingleBuffer
+  sim.Phase2.T4_DoubleBufferedMemoryBound
+  sim.Phase2.T5_TwoOutputTiles
+  sim.Phase2.T5b_OneOutputBuffer
+  sim.Phase2.T7_ExactCapacityStillRuns
+  3-way summary: functional: seed=20261014 cases=20 all_three_agree=0 model_wrong=20 cpp_ref_wrong=0 extreme_cases=1
+required: sim.Phase2.T4_DoubleBufferedMemoryBound functional.gemm20
+verdict: CAUGHT
+
+## N5 (src/pe/pe.cpp)
+41:  return f >= 0 && static_cast<Cycle>(f) <= now;  // MUTANT N5 freed at feed start
+failing tests (1):
+  sim.Phase2.T2_DoubleBufferedComputeBound
+required: sim.Phase2.T2_DoubleBufferedComputeBound
+verdict: CAUGHT
+
+## N6 (src/pe/pe.cpp)
+64:    // MUTANT N6 next tile does not wait for the drain
+failing tests (2):
+  functional.gemm20
+  sim.Phase2.T5_TwoOutputTiles
+required: sim.Phase2.T5_TwoOutputTiles
+verdict: CAUGHT
+
+## N7 (src/pe/pe.cpp)
+65:    // MUTANT N7 output buffer rule ignored
+failing tests (2):
+  functional.gemm20
+  sim.Phase2.T5b_OneOutputBuffer
+  3-way summary: functional: seed=20261014 cases=20 all_three_agree=19 model_wrong=1 cpp_ref_wrong=0 extreme_cases=1
+required: sim.Phase2.T5b_OneOutputBuffer
+verdict: CAUGHT
+
+## N8 (src/pe/gemm_layout.cpp)
+57:      const std::uint64_t blk = b_block_addr(nj, (c + 1) % chunks()) - b_base;  // MUTANT N8 B blocks permuted
+failing tests (4):
+  functional.gemm20
+  sim.Phase2.T2_DoubleBufferedComputeBound
+  sim.Phase2.T3_SingleBuffer
+  sim.Phase2.T4_DoubleBufferedMemoryBound
+  3-way summary: functional: seed=20261014 cases=20 all_three_agree=8 model_wrong=12 cpp_ref_wrong=0 extreme_cases=1
+required: functional.gemm20
+verdict: CAUGHT
+
+## N9 (tools/gemm_ref.cpp)
+35:      for (std::uint64_t k = 0; k + 1 < K; ++k) s +=  /* MUTANT N9 reference drops last k */ std::int64_t{A[i * K + k]} * std::int64_t{B[k * N + j]};
+failing tests (1):
+  functional.gemm20
+  3-way summary: functional: seed=20261014 cases=20 all_three_agree=0 model_wrong=0 cpp_ref_wrong=20 extreme_cases=1
+required: functional.gemm20
+verdict: CAUGHT
+
+## Result
+all mutants caught by their required tests: yes

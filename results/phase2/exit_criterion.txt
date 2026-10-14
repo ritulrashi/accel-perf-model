@@ -1,0 +1,250 @@
+# Phase 2 exit criterion: compute unit, double buffering, functional match
+command: scripts/phase2_exit.sh
+
+## Provenance
+date_utc: 2026-10-14T06:55:42Z
+commit: d730c59cb9a15e1d6c47aff9ea573cc470cbdb52
+tree: clean
+host: Linux 6.8.0-1064-azure x86_64
+os: Ubuntu 24.04.3 LTS
+lscpu:
+  Architecture:                            x86_64
+  CPU(s):                                  2
+  Model name:                              AMD EPYC 7763 64-Core Processor
+  Thread(s) per core:                      2
+  Core(s) per socket:                      1
+  Socket(s):                               1
+  L1d cache:                               32 KiB (1 instance)
+  L1i cache:                               32 KiB (1 instance)
+  L2 cache:                                512 KiB (1 instance)
+  L3 cache:                                32 MiB (1 instance)
+mem_total: 8132888 kB
+tools:
+  c++: c++ (Ubuntu 13.3.0-6ubuntu2~24.04) 13.3.0
+  cmake: cmake version 3.28.3
+  ninja: 1.11.1
+  systemc: 3.0.2 (release date 20251031) at /opt/systemc-3.0.2, commit 70b0fc8e4a74acc677b0fc73cea08f940c2115d5
+  googletest: 52eb8108c5bdec04579160ae17225d66034bd723  # v1.17.0
+  python3: Python 3.12.3
+  numpy: 1.26.4
+  verilator: Verilator 5.020 2024-01-01 rev (Debian 5.020-1)
+
+## Preset: asan
+### Expected vs measured (Phase 1 §6 and Phase 2 §5 hand derivations)
+count: F2D_DramToSramStrided dma0.d0.bursts expected=8 measured=8
+count: F2D_SramToDramStrided dma0.d0.bursts expected=8 measured=8
+count: T1_SingleTransfer dma0.d0.bursts expected=4 measured=4
+count: T1_SingleTransfer dram.bus_busy_cycles expected=16 measured=16
+count: T1_SingleTransfer dram.row_hits expected=3 measured=3
+count: T1_SingleTransfer dram.row_misses expected=1 measured=1
+count: T1_SingleTransfer sram.conflict_line_cycles expected=0 measured=0
+count: T1c_ReverseDirection dram.bytes_written expected=256 measured=256
+count: T2_TwoDmasShareOneChannel dram.bus_busy_cycles expected=32 measured=32
+count: T2_TwoDmasShareOneChannel dram.row_hits expected=6 measured=6
+count: T2_TwoDmasShareOneChannel dram.row_misses expected=2 measured=2
+count: T2_TwoDmasShareOneChannel sram.conflict_line_cycles expected=0 measured=0
+count: T2b_QueueBackpressure dram.backpressure_cycles expected=35 measured=35
+count: T3a_SramBankConflict sram.conflict_line_cycles expected=1 measured=1
+count: T3b_SramNoConflict sram.conflict_line_cycles expected=0 measured=0
+count: T3c_SramIntraRequestSerialization sram.conflict_line_cycles expected=0 measured=0
+count: T4a_RowHit dram.row_hits expected=1 measured=1
+count: T4b_RowMiss dram.row_misses expected=2 measured=2
+cycles: T1_OneTileOneChunk pe.done expected=158 measured=158
+cycles: T1_OneTileOneChunk pe.s0.feed expected=52 measured=52
+cycles: T1_OneTileOneChunk pe.s0.loaded expected=52 measured=52
+cycles: T1_OneTileOneChunk pe.t0.done expected=138 measured=138
+cycles: T1_SingleTransfer dma0.d0.done expected=48 measured=48
+cycles: T1b_OneBufferIsLatencyBound dma0.d0.done expected=84 measured=84
+cycles: T1c_ReverseDirection dma0.d0.done expected=48 measured=48
+cycles: T2_DoubleBufferedComputeBound pe.done expected=350 measured=350
+cycles: T2_DoubleBufferedComputeBound pe.s0.feed expected=52 measured=52
+cycles: T2_DoubleBufferedComputeBound pe.s0.loaded expected=52 measured=52
+cycles: T2_DoubleBufferedComputeBound pe.s1.feed expected=116 measured=116
+cycles: T2_DoubleBufferedComputeBound pe.s1.loaded expected=92 measured=92
+cycles: T2_DoubleBufferedComputeBound pe.s2.feed expected=180 measured=180
+cycles: T2_DoubleBufferedComputeBound pe.s2.loaded expected=168 measured=168
+cycles: T2_DoubleBufferedComputeBound pe.s3.feed expected=244 measured=244
+cycles: T2_DoubleBufferedComputeBound pe.s3.loaded expected=232 measured=232
+cycles: T2_DoubleBufferedComputeBound pe.t0.done expected=330 measured=330
+cycles: T2_TwoDmasShareOneChannel dma0.d0.done expected=64 measured=64
+cycles: T2_TwoDmasShareOneChannel dma1.d0.done expected=60 measured=60
+cycles: T2b_QueueBackpressure dma0.d0.done expected=54 measured=54
+cycles: T3_SingleBuffer pe.done expected=506 measured=506
+cycles: T3_SingleBuffer pe.s0.feed expected=52 measured=52
+cycles: T3_SingleBuffer pe.s0.loaded expected=52 measured=52
+cycles: T3_SingleBuffer pe.s1.feed expected=168 measured=168
+cycles: T3_SingleBuffer pe.s1.loaded expected=168 measured=168
+cycles: T3_SingleBuffer pe.s2.feed expected=284 measured=284
+cycles: T3_SingleBuffer pe.s2.loaded expected=284 measured=284
+cycles: T3_SingleBuffer pe.s3.feed expected=400 measured=400
+cycles: T3_SingleBuffer pe.s3.loaded expected=400 measured=400
+cycles: T3_SingleBuffer pe.t0.done expected=486 measured=486
+cycles: T3a_SramBankConflict tgs0.r0.response expected=2 measured=2
+cycles: T3a_SramBankConflict tgs1.r0.response expected=3 measured=3
+cycles: T3b_SramNoConflict tgs0.r0.response expected=2 measured=2
+cycles: T3b_SramNoConflict tgs1.r0.response expected=2 measured=2
+cycles: T3c_SramIntraRequestSerialization tgs0.r0.response expected=3 measured=3
+cycles: T4_DoubleBufferedMemoryBound pe.done expected=446 measured=446
+cycles: T4_DoubleBufferedMemoryBound pe.s0.feed expected=92 measured=92
+cycles: T4_DoubleBufferedMemoryBound pe.s0.loaded expected=92 measured=92
+cycles: T4_DoubleBufferedMemoryBound pe.s1.feed expected=172 measured=172
+cycles: T4_DoubleBufferedMemoryBound pe.s1.loaded expected=172 measured=172
+cycles: T4_DoubleBufferedMemoryBound pe.s2.feed expected=252 measured=252
+cycles: T4_DoubleBufferedMemoryBound pe.s2.loaded expected=252 measured=252
+cycles: T4_DoubleBufferedMemoryBound pe.s3.feed expected=332 measured=332
+cycles: T4_DoubleBufferedMemoryBound pe.s3.loaded expected=332 measured=332
+cycles: T4_DoubleBufferedMemoryBound pe.t0.done expected=418 measured=418
+cycles: T4a_RowHit tgd0.r0.response expected=34 measured=34
+cycles: T4a_RowHit tgd0.r1.issued expected=100 measured=100
+cycles: T4a_RowHit tgd0.r1.response expected=114 measured=114
+cycles: T4b_RowMiss tgd0.r0.response expected=34 measured=34
+cycles: T4b_RowMiss tgd0.r1.issued expected=100 measured=100
+cycles: T4b_RowMiss tgd0.r1.response expected=134 measured=134
+cycles: T4c_SameBankBackToBack tgd0.r0.response expected=34 measured=34
+cycles: T4c_SameBankBackToBack tgd0.r1.issued expected=1 measured=1
+cycles: T4c_SameBankBackToBack tgd0.r1.response expected=58 measured=58
+cycles: T4d_OtherBankBackToBack tgd0.r0.response expected=34 measured=34
+cycles: T4d_OtherBankBackToBack tgd0.r1.issued expected=1 measured=1
+cycles: T4d_OtherBankBackToBack tgd0.r1.response expected=38 measured=38
+cycles: T5_TwoOutputTiles pe.done expected=244 measured=244
+cycles: T5_TwoOutputTiles pe.s0.feed expected=52 measured=52
+cycles: T5_TwoOutputTiles pe.s0.loaded expected=52 measured=52
+cycles: T5_TwoOutputTiles pe.s1.feed expected=138 measured=138
+cycles: T5_TwoOutputTiles pe.s1.loaded expected=92 measured=92
+cycles: T5_TwoOutputTiles pe.t0.done expected=138 measured=138
+cycles: T5_TwoOutputTiles pe.t0.store_done expected=158 measured=158
+cycles: T5_TwoOutputTiles pe.t1.done expected=224 measured=224
+cycles: T5b_OneOutputBuffer pe.done expected=264 measured=264
+cycles: T5b_OneOutputBuffer pe.s1.feed expected=158 measured=158
+cycles: T5b_OneOutputBuffer pe.t0.store_done expected=158 measured=158
+cycles: T5b_OneOutputBuffer pe.t1.done expected=244 measured=244
+cycles: T6_DmaStreamsAcrossDescriptors dma0.d0.done expected=20 measured=20
+cycles: T6_DmaStreamsAcrossDescriptors dma0.d1.done expected=28 measured=28
+cycles: T7_ExactCapacityStillRuns pe.done expected=158 measured=158
+### Mismatches
+none
+### Summary
+100% tests passed, 0 tests failed out of 58
+determinism    =   0.07 sec*proc (1 test)
+functional     =   0.97 sec*proc (1 test)
+sim            =   0.76 sec*proc (22 tests)
+unit           =   0.67 sec*proc (34 tests)
+ctest 20-case functional: seed=20261014 cases=20 all_three_agree=20 model_wrong=0 cpp_ref_wrong=0 extreme_cases=1
+failed tests: none
+
+## Preset: release
+### Expected vs measured (Phase 1 §6 and Phase 2 §5 hand derivations)
+count: F2D_DramToSramStrided dma0.d0.bursts expected=8 measured=8
+count: F2D_SramToDramStrided dma0.d0.bursts expected=8 measured=8
+count: T1_SingleTransfer dma0.d0.bursts expected=4 measured=4
+count: T1_SingleTransfer dram.bus_busy_cycles expected=16 measured=16
+count: T1_SingleTransfer dram.row_hits expected=3 measured=3
+count: T1_SingleTransfer dram.row_misses expected=1 measured=1
+count: T1_SingleTransfer sram.conflict_line_cycles expected=0 measured=0
+count: T1c_ReverseDirection dram.bytes_written expected=256 measured=256
+count: T2_TwoDmasShareOneChannel dram.bus_busy_cycles expected=32 measured=32
+count: T2_TwoDmasShareOneChannel dram.row_hits expected=6 measured=6
+count: T2_TwoDmasShareOneChannel dram.row_misses expected=2 measured=2
+count: T2_TwoDmasShareOneChannel sram.conflict_line_cycles expected=0 measured=0
+count: T2b_QueueBackpressure dram.backpressure_cycles expected=35 measured=35
+count: T3a_SramBankConflict sram.conflict_line_cycles expected=1 measured=1
+count: T3b_SramNoConflict sram.conflict_line_cycles expected=0 measured=0
+count: T3c_SramIntraRequestSerialization sram.conflict_line_cycles expected=0 measured=0
+count: T4a_RowHit dram.row_hits expected=1 measured=1
+count: T4b_RowMiss dram.row_misses expected=2 measured=2
+cycles: T1_OneTileOneChunk pe.done expected=158 measured=158
+cycles: T1_OneTileOneChunk pe.s0.feed expected=52 measured=52
+cycles: T1_OneTileOneChunk pe.s0.loaded expected=52 measured=52
+cycles: T1_OneTileOneChunk pe.t0.done expected=138 measured=138
+cycles: T1_SingleTransfer dma0.d0.done expected=48 measured=48
+cycles: T1b_OneBufferIsLatencyBound dma0.d0.done expected=84 measured=84
+cycles: T1c_ReverseDirection dma0.d0.done expected=48 measured=48
+cycles: T2_DoubleBufferedComputeBound pe.done expected=350 measured=350
+cycles: T2_DoubleBufferedComputeBound pe.s0.feed expected=52 measured=52
+cycles: T2_DoubleBufferedComputeBound pe.s0.loaded expected=52 measured=52
+cycles: T2_DoubleBufferedComputeBound pe.s1.feed expected=116 measured=116
+cycles: T2_DoubleBufferedComputeBound pe.s1.loaded expected=92 measured=92
+cycles: T2_DoubleBufferedComputeBound pe.s2.feed expected=180 measured=180
+cycles: T2_DoubleBufferedComputeBound pe.s2.loaded expected=168 measured=168
+cycles: T2_DoubleBufferedComputeBound pe.s3.feed expected=244 measured=244
+cycles: T2_DoubleBufferedComputeBound pe.s3.loaded expected=232 measured=232
+cycles: T2_DoubleBufferedComputeBound pe.t0.done expected=330 measured=330
+cycles: T2_TwoDmasShareOneChannel dma0.d0.done expected=64 measured=64
+cycles: T2_TwoDmasShareOneChannel dma1.d0.done expected=60 measured=60
+cycles: T2b_QueueBackpressure dma0.d0.done expected=54 measured=54
+cycles: T3_SingleBuffer pe.done expected=506 measured=506
+cycles: T3_SingleBuffer pe.s0.feed expected=52 measured=52
+cycles: T3_SingleBuffer pe.s0.loaded expected=52 measured=52
+cycles: T3_SingleBuffer pe.s1.feed expected=168 measured=168
+cycles: T3_SingleBuffer pe.s1.loaded expected=168 measured=168
+cycles: T3_SingleBuffer pe.s2.feed expected=284 measured=284
+cycles: T3_SingleBuffer pe.s2.loaded expected=284 measured=284
+cycles: T3_SingleBuffer pe.s3.feed expected=400 measured=400
+cycles: T3_SingleBuffer pe.s3.loaded expected=400 measured=400
+cycles: T3_SingleBuffer pe.t0.done expected=486 measured=486
+cycles: T3a_SramBankConflict tgs0.r0.response expected=2 measured=2
+cycles: T3a_SramBankConflict tgs1.r0.response expected=3 measured=3
+cycles: T3b_SramNoConflict tgs0.r0.response expected=2 measured=2
+cycles: T3b_SramNoConflict tgs1.r0.response expected=2 measured=2
+cycles: T3c_SramIntraRequestSerialization tgs0.r0.response expected=3 measured=3
+cycles: T4_DoubleBufferedMemoryBound pe.done expected=446 measured=446
+cycles: T4_DoubleBufferedMemoryBound pe.s0.feed expected=92 measured=92
+cycles: T4_DoubleBufferedMemoryBound pe.s0.loaded expected=92 measured=92
+cycles: T4_DoubleBufferedMemoryBound pe.s1.feed expected=172 measured=172
+cycles: T4_DoubleBufferedMemoryBound pe.s1.loaded expected=172 measured=172
+cycles: T4_DoubleBufferedMemoryBound pe.s2.feed expected=252 measured=252
+cycles: T4_DoubleBufferedMemoryBound pe.s2.loaded expected=252 measured=252
+cycles: T4_DoubleBufferedMemoryBound pe.s3.feed expected=332 measured=332
+cycles: T4_DoubleBufferedMemoryBound pe.s3.loaded expected=332 measured=332
+cycles: T4_DoubleBufferedMemoryBound pe.t0.done expected=418 measured=418
+cycles: T4a_RowHit tgd0.r0.response expected=34 measured=34
+cycles: T4a_RowHit tgd0.r1.issued expected=100 measured=100
+cycles: T4a_RowHit tgd0.r1.response expected=114 measured=114
+cycles: T4b_RowMiss tgd0.r0.response expected=34 measured=34
+cycles: T4b_RowMiss tgd0.r1.issued expected=100 measured=100
+cycles: T4b_RowMiss tgd0.r1.response expected=134 measured=134
+cycles: T4c_SameBankBackToBack tgd0.r0.response expected=34 measured=34
+cycles: T4c_SameBankBackToBack tgd0.r1.issued expected=1 measured=1
+cycles: T4c_SameBankBackToBack tgd0.r1.response expected=58 measured=58
+cycles: T4d_OtherBankBackToBack tgd0.r0.response expected=34 measured=34
+cycles: T4d_OtherBankBackToBack tgd0.r1.issued expected=1 measured=1
+cycles: T4d_OtherBankBackToBack tgd0.r1.response expected=38 measured=38
+cycles: T5_TwoOutputTiles pe.done expected=244 measured=244
+cycles: T5_TwoOutputTiles pe.s0.feed expected=52 measured=52
+cycles: T5_TwoOutputTiles pe.s0.loaded expected=52 measured=52
+cycles: T5_TwoOutputTiles pe.s1.feed expected=138 measured=138
+cycles: T5_TwoOutputTiles pe.s1.loaded expected=92 measured=92
+cycles: T5_TwoOutputTiles pe.t0.done expected=138 measured=138
+cycles: T5_TwoOutputTiles pe.t0.store_done expected=158 measured=158
+cycles: T5_TwoOutputTiles pe.t1.done expected=224 measured=224
+cycles: T5b_OneOutputBuffer pe.done expected=264 measured=264
+cycles: T5b_OneOutputBuffer pe.s1.feed expected=158 measured=158
+cycles: T5b_OneOutputBuffer pe.t0.store_done expected=158 measured=158
+cycles: T5b_OneOutputBuffer pe.t1.done expected=244 measured=244
+cycles: T6_DmaStreamsAcrossDescriptors dma0.d0.done expected=20 measured=20
+cycles: T6_DmaStreamsAcrossDescriptors dma0.d1.done expected=28 measured=28
+cycles: T7_ExactCapacityStillRuns pe.done expected=158 measured=158
+### Mismatches
+none
+### Summary
+100% tests passed, 0 tests failed out of 58
+determinism    =   0.03 sec*proc (1 test)
+functional     =   0.25 sec*proc (1 test)
+sim            =   0.15 sec*proc (22 tests)
+unit           =   0.08 sec*proc (34 tests)
+ctest 20-case functional: seed=20261014 cases=20 all_three_agree=20 model_wrong=0 cpp_ref_wrong=0 extreme_cases=1
+failed tests: none
+
+## Functional match, 200 cases (release build)
+command: python3 python/gemm_check.py --apm-gemm build/release/apm_gemm --gemm-ref build/release/gemm_ref --cases 200 --csv results/phase2/functional.csv
+exit status: 0
+functional: seed=20261014 cases=200 all_three_agree=200 model_wrong=0 cpp_ref_wrong=0 extreme_cases=17
+mismatching cases:
+  none
+case shapes covered (array RxC, Kt, nbuf, nout):
+  R: 1 (48 cases), 2 (44 cases), 4 (55 cases), 8 (53 cases)
+  C: 16 (89 cases), 32 (111 cases)
+  Kt: 16 (54 cases), 32 (88 cases), 64 (58 cases)
+  nbuf: 1 (94 cases), 2 (106 cases)
+  nout: 1 (101 cases), 2 (99 cases)
+  M up to 32, N up to 96, K up to 256
