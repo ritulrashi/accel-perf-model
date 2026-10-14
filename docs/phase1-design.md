@@ -193,6 +193,11 @@ conflict.
 
 ### 3.6 `DmaEngine`
 
+> **Changed in Phase 2** (docs/phase2-design.md §1): bursts now stream across
+> descriptors instead of one descriptor at a time, and request-socket
+> occupancy is tracked per socket (write first). Every Phase 1 scenario uses
+> one descriptor per engine, so the expected values below are unchanged.
+
 | Owns | Meaning |
 |---|---|
 | descriptor queue | Submitted tile descriptors (FIFO, processed one at a time) |

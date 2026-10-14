@@ -7,6 +7,7 @@
 #include <stdexcept>
 
 #include "common/cycle.h"
+#include "common/sim_guard.h"
 #include "dma/dma_engine.h"
 #include "mem/dram_channel.h"
 #include "mem/sram.h"
@@ -24,6 +25,7 @@ struct Spec {
   SramParams sram;
   DmaParams dma;
   std::vector<TileDesc> dma_descs;               // DMA engine i runs dma_descs[i]
+  std::vector<TileDesc> dma0_more;               // further descriptors for engine 0
   std::vector<std::vector<TgRequest>> tg_dram;  // bound to DRAM after the DMAs
   std::vector<std::vector<TgRequest>> tg_sram;  // bound to SRAM after the DMAs
 };
@@ -58,6 +60,15 @@ const std::map<std::string, Spec>& specs() {
     s["t4d"].tg_dram = {{rd(0, 0, 64), rd(1, 1024, 64)}};
     s["f2d_d2s"].dma_descs = {TileDesc{DmaDir::DramToSram, 0, 0, 4, 128, 1024, 256}};
     s["f2d_s2d"].dma_descs = {TileDesc{DmaDir::SramToDram, 0, 8192, 4, 128, 256, 1024}};
+    // Phase 2 P2-T6: two descriptors stream back to back through one DMA
+    // (P2 config: W=32, t_hit=t_miss=10, Q=16, M=8).
+    Spec& t6 = s["p2t6"];
+    t6.dram.bus_bytes_per_cycle = 32;
+    t6.dram.t_hit = t6.dram.t_miss = 10;
+    t6.dram.queue_depth = 16;
+    t6.dma.max_bursts_in_flight = 8;
+    t6.dma_descs = {d2s(0, 0, 256)};
+    t6.dma0_more = {d2s(2048, 256, 256)};
     return s;
   }();
   return m;
@@ -78,6 +89,8 @@ class Top : public sc_core::sc_module {
       dmas.back()->dram_socket.bind(dram.socket);
       dmas.back()->sram_socket.bind(sram.socket);
       dmas.back()->submit(s.dma_descs[i]);
+      if (i == 0)
+        for (const auto& d : s.dma0_more) dmas.back()->submit(d);
     }
     for (std::size_t i = 0; i < s.tg_dram.size(); ++i) {
       tgs.push_back(std::make_unique<TrafficGen>(("tgd" + std::to_string(i)).c_str(), s.tg_dram[i]));
@@ -120,9 +133,7 @@ std::vector<std::string> scenario_names() {
 }
 
 ScenarioResult run_scenario(const std::string& name) {
-  static bool used = false;
-  require(!used, "run_scenario: one SystemC simulation per process (run tests through ctest)");
-  used = true;
+  claim_simulation();
   check_time_resolution();
 
   const auto it = specs().find(name);
@@ -146,7 +157,7 @@ ScenarioResult run_scenario(const std::string& name) {
   r.complete = true;
   for (const auto& d : top->dmas) {
     d->report(r.values);
-    r.complete = r.complete && d->results().size() == 1;
+    for (const auto& res : d->results()) r.complete = r.complete && res.complete;
   }
   for (const auto& t : top->tgs) {
     t->report(r.values);
@@ -157,6 +168,7 @@ ScenarioResult run_scenario(const std::string& name) {
     auto dram_exp = dram0;
     auto sram_exp = sram0;
     for (const auto& d : spec.dma_descs) apply_reference(d, dram0, sram0, dram_exp, sram_exp);
+    for (const auto& d : spec.dma0_more) apply_reference(d, dram0, sram0, dram_exp, sram_exp);
     std::vector<std::uint8_t> dram_got(dram0.size()), sram_got(sram0.size());
     top->dram.peek(0, dram_got.data(), dram_got.size());
     top->sram.peek(0, sram_got.data(), sram_got.size());

@@ -30,13 +30,17 @@ FetchContent_Declare(googletest
 set(INSTALL_GTEST OFF CACHE BOOL "" FORCE)
 FetchContent_MakeAvailable(googletest)
 
-# Pure C++ timing formulas (design note §3.3-3.5); no SystemC dependency so
-# they can be unit-tested in-process.
-add_library(apm_timing
+# Pure C++ (no SystemC): timing formulas, systolic contract, GEMM layout and
+# PE buffer planning. Unit-tested in-process.
+add_library(apm_core
   src/mem/dram_timing.cpp
   src/mem/sram_timing.cpp
+  src/compute/systolic.cpp
+  src/pe/lmem_alloc.cpp
+  src/pe/gemm_layout.cpp
+  src/pe/pe_config.cpp
 )
-target_include_directories(apm_timing PUBLIC src)
+target_include_directories(apm_core PUBLIC src)
 
 # SystemC/TLM models and the directed-scenario harness.
 add_library(apm_model
@@ -44,13 +48,19 @@ add_library(apm_model
   src/mem/dram_channel.cpp
   src/mem/sram.cpp
   src/dma/dma_engine.cpp
+  src/pe/pe.cpp
   src/test/traffic_gen.cpp
   src/test/scenarios.cpp
+  src/test/gemm_run.cpp
 )
-target_link_libraries(apm_model PUBLIC apm_timing SystemC::systemc)
+target_link_libraries(apm_model PUBLIC apm_core SystemC::systemc)
 
 add_executable(apm_scenario tools/apm_scenario.cpp)
 target_link_libraries(apm_scenario PRIVATE apm_model)
+add_executable(apm_gemm tools/apm_gemm.cpp)
+target_link_libraries(apm_gemm PRIVATE apm_model)
+# Standalone functional reference: deliberately links nothing from the model.
+add_executable(gemm_ref tools/gemm_ref.cpp)
 
 enable_testing()
 include(GoogleTest)
@@ -59,13 +69,15 @@ add_executable(unit_tests
   tests/unit/dram_timing_test.cpp
   tests/unit/sram_timing_test.cpp
   tests/unit/rr_arbiter_test.cpp
+  tests/unit/systolic_test.cpp
+  tests/unit/pe_config_test.cpp
 )
-target_link_libraries(unit_tests PRIVATE apm_timing GTest::gtest_main)
+target_link_libraries(unit_tests PRIVATE apm_core GTest::gtest_main)
 gtest_discover_tests(unit_tests TEST_PREFIX "unit." PROPERTIES LABELS unit)
 
 # SystemC cannot be re-elaborated in one process. gtest_discover_tests runs
 # every test case in its own process, which is exactly what we need.
-add_executable(sim_tests tests/sim/main.cpp tests/sim/scenarios_test.cpp)
+add_executable(sim_tests tests/sim/main.cpp tests/sim/scenarios_test.cpp tests/sim/phase2_test.cpp)
 target_link_libraries(sim_tests PRIVATE apm_model GTest::gtest)
 gtest_discover_tests(sim_tests TEST_PREFIX "sim."
   PROPERTIES LABELS sim ENVIRONMENT "SYSTEMC_DISABLE_COPYRIGHT_MESSAGE=1")
@@ -77,3 +89,11 @@ add_test(NAME determinism.t2
           -P ${CMAKE_SOURCE_DIR}/tests/determinism.cmake)
 set_tests_properties(determinism.t2 PROPERTIES LABELS determinism
   ENVIRONMENT "SYSTEMC_DISABLE_COPYRIGHT_MESSAGE=1")
+
+# Functional match (Phase 2 rule 4): random INT8 GEMMs, model vs NumPy vs the
+# standalone C++ reference. 20 cases here; the exit script runs 200.
+find_package(Python3 REQUIRED COMPONENTS Interpreter)
+add_test(NAME functional.gemm20
+  COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/python/gemm_check.py
+          --apm-gemm $<TARGET_FILE:apm_gemm> --gemm-ref $<TARGET_FILE:gemm_ref> --cases 20)
+set_tests_properties(functional.gemm20 PROPERTIES LABELS functional)

@@ -37,11 +37,42 @@ What this project does **not** model or verify. Updated every phase.
   burst, and never cross a row. SRAM requests are line-aligned. Illegal
   requests stop the simulation with an error. The DMA only generates legal
   ones.
-- **DMA:** one descriptor at a time per engine (no overlap between
-  descriptors), store-and-forward per burst, in-order writes, no address
-  translation, no scatter/gather beyond 2-D strides.
+- **DMA:** store-and-forward per burst, in-order reads and in-order writes,
+  no address translation, no scatter/gather beyond 2-D strides. (Phase 1
+  processed one descriptor at a time. Since Phase 2, bursts stream across
+  descriptors; see the Phase 2 note §1.)
 - **Same-cycle arbitration is round-robin by port number**, and port number
   is binding order. Other policies (age-based, QoS) are not modelled.
 - **Directed tests only.** Phase 1 checks hand-derived cycle counts on a
   dozen small scenarios plus data correctness. It does not show that the
   timing is realistic, only that the model does what the design note says.
+
+## Compute unit, local memory, double buffering (Phase 2)
+- **Integer mode only:** INT8 inputs, INT32 accumulation. Floating-point
+  precisions arrive in Phase 4.
+- **One accumulator set (output-stationary).** Fill (R + C − 2) and drain (R)
+  are exposed once per output tile. Designs with double-buffered
+  accumulators overlap a tile's drain with the next tile's fill. Not
+  modelled.
+- **The array's operand/result port to LMEM is ideal:** R + C bytes in and
+  4C bytes out per cycle, never conflicting with DMA traffic. Only the DMA
+  side of LMEM has bank timing.
+- **The functional data path applies a whole chunk at feed start** and
+  writes the tile at drain end. Values are therefore exact, but there is no
+  per-cycle data model of the array. The per-cycle contract (§2.2) is
+  checked against RTL in Phase 5.
+- **Host pre-packing is assumed and costs nothing.** Operands sit in DRAM in
+  tile order. Packing time and the extra DRAM copy are not modelled.
+- **Naive loop order:** B blocks are reloaded for every output-tile row, with
+  no operand reuse across tiles. This is deliberate as a baseline. Better
+  schedules come in Phase 3.
+- **Controller decisions take zero cycles:** a feed can start in the cycle
+  its last load completes. Real control logic would add a few cycles.
+- **Output-buffer reuse is checked at feed start** (conservative): tile t
+  waits for the store of tile t − n_out before its first chunk feeds, even
+  though the buffer is only written at drain.
+- **Shapes:** M % R = 0, N % C = 0, K % Kt = 0, Kt % 16 = 0, C % 4 = 0, and
+  K ≤ 131071 (INT32 range). There is no edge-tile (padding) support.
+- **Functional coverage:** 200 random cases over arrays R ∈ {1,2,4,8} ×
+  C ∈ {16,32}, Kt ∈ {16,32,64}, small M/N/K, and both buffering modes. This
+  is good evidence for these shapes, not a proof for all shapes.
