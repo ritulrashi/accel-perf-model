@@ -118,3 +118,50 @@ What this project does **not** model or verify. Updated every phase.
   up to 16×16. The results describe this model at these sizes, not real
   accelerators.
 
+
+## Precision modes, vector unit, attention (Phase 4)
+- **Precision timing is one knob:** an e-byte mode takes `q = e` cycles per
+  reduction step (a fixed number of multiplier bits per cell). Real arrays
+  have mode-specific datapaths. FP8, TF32 and mixed-precision operand pairs
+  are not modelled.
+- **Accumulators and GEMM outputs are always 4 bytes** (INT32 or FP32). S is
+  written to DRAM in FP32/INT32 even when P is FP16 or INT8.
+- **Floating point is bit-exact to a spec, not to any hardware.**
+  - FP32 accumulation is sequential in k, with no FMA and no wider
+    accumulator.
+  - `vu_exp` is one specified degree-6 polynomial that flushes results below
+    2^−125 to zero.
+  - NaN and infinity inputs are rejected or never generated, and overflow is
+    impossible by construction.
+- **Vector unit:**
+  - one unit on its own DRAM port, not on the mesh and not using the shared
+    SRAM;
+  - rows are processed one at a time in three dependent passes, with no
+    overlap between rows;
+  - masked elements cost the same as unmasked ones;
+  - the VU↔VMEM port is ideal.
+- **Programs are unfused and serialized.**
+  - Ops never overlap: the array idles during softmax, and the VU idles
+    during GEMMs.
+  - Each op starts as a separate simulation with all DRAM banks closed, so
+    open rows do not carry across op boundaries.
+  - There is no FlashAttention-style fusion. S and P make a full round trip
+    through DRAM.
+- **No causal tile skipping:** prefill computes all of S and all of P·V,
+  including the masked upper triangle (about half the work).
+- **Layouts are assumed, not produced.**
+  - The KV cache is stored in the array's packed B layouts, and Q is
+    host-packed, both at no cost. The Q/K/V/O projections and the KV-cache
+    append are not modelled.
+  - INT8 Q/K/V scales are computed from the data itself (ideal calibration).
+  - INT8 O is dequantized on the host at no cost.
+- **Shapes and padding:**
+  - only M is padded (to R; the padding is computed and charged as compute);
+  - N and K must divide C and Kt;
+  - g ≤ R.
+- **Scope of the workloads:** one KV head with g query heads, head dim 64,
+  sequence lengths up to 1024 (prefill) and 8192 (decode). Multi-head is
+  repetition and is not run.
+- **Numerics use N(0,1) random inputs.** Real activations have outliers and
+  structure (attention sinks, peaked rows). INT8 accuracy on real models can
+  be far worse or better than measured here.

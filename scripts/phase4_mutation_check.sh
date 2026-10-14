@@ -31,7 +31,7 @@ mutants=(
   "M1|src/pe/pe_config.h|s#Cycle feed_cycles() const { return cycles_per_step() \* kt; }#Cycle feed_cycles() const { return kt; }  // MUTANT M1 feed ignores q#|sim.Phase4.T1_Fp16"
   "M2|src/pe/gemm_layout.h|s#std::uint64_t b_block_bytes() const { return kt \* array.cols \* elem(); }#std::uint64_t b_block_bytes() const { return kt * array.cols; }  // MUTANT M2 staging ignores e#|sim.Phase4.T1_Fp16 functional.accel_prec20"
   "M3|src/compute/systolic.cpp|s#const float prod = a\[i \* kt + k\] \* b\[k \* a_.cols + j\];#const float prod = 0.0f; acc = std::fma(a[i * kt + k], b[k * a_.cols + j], acc);  // MUTANT M3 fused multiply-add#|functional.accel_prec20 unit.Systolic.Fp32AccumulateIsNotFused"
-  "M4|src/compute/numerics.cpp|s#if (rem > 0x1000u .*#if (false) ++m16;  // MUTANT M4 FP16 truncates#|unit.Numerics.Fp16RoundToNearestEvenHandCases functional.attn10"
+  "M4|src/compute/numerics.cpp|s#if (rem > 0x1000u .*#if (rem > 0xffffu) ++m16;  // MUTANT M4 FP16 truncates (rem <= 0x1fff: never rounds up)#|unit.Numerics.Fp16RoundToNearestEvenHandCases functional.attn10"
   "M5|src/compute/numerics.cpp|s#lane\[j % lanes\] += e\[j\];#lane[0] += e[j];  // MUTANT M5 sequential sum#|unit.Numerics.LaneOrderSumHandCase functional.attn10"
   "M6|src/vec/softmax.cpp|s#auto valid = \[\&\](std::uint64_t j) { return .*#auto valid = [\&](std::uint64_t j) { (void)j; (void)row; return true; };  // MUTANT M6 mask ignored#|unit.Softmax.CausalRowZeroIsOneHot functional.attn10"
   "M7|src/vec/vu_plan.h|s#return 3 \* ((n + c.lanes - 1) / c.lanes + c.t_vu);#return 2 * ((n + c.lanes - 1) / c.lanes + c.t_vu);  // MUTANT M7 two passes#|sim.Phase4.V1_Fp16 unit.VuPlan.RowCycles"
