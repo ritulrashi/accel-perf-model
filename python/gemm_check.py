@@ -101,8 +101,7 @@ def main():
                   f"cpp==numpy={int(row['cpp_eq_numpy'])} model==cpp={int(row['model_eq_cpp'])} {flag}")
     if args.csv:
         with open(args.csv, "w", newline="") as f:
-            w = csv.DictWriter(f, fieldnames=list(rows[0].keys()), lineterminator="
-")
+            w = csv.DictWriter(f, fieldnames=list(rows[0].keys()), lineterminator="\n")
             w.writeheader()
             w.writerows(rows)
     ok = sum(r["match"] for r in rows)
