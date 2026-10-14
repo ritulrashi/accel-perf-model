@@ -34,7 +34,7 @@ mutants=(
   "N2|src/compute/systolic.cpp|s#acc_\[std::size_t{i} \* a_.cols + j\] += sum;#acc_[std::size_t{i} * a_.cols + j] = sum;  // MUTANT N2 overwrite#|functional.gemm20"
   "N3|src/dma/dma_engine.cpp|s#^      !to_read_.empty() && buffers_free_ > 0#      (to_read_.empty() or to_read_.front()->desc == 0 or results_[to_read_.front()->desc - 1].complete) and /* MUTANT N3 one descriptor at a time */ !to_read_.empty() \&\& buffers_free_ > 0#|sim.Phase2.T6_DmaStreamsAcrossDescriptors sim.Phase2.T2_DoubleBufferedComputeBound"
   "N4|src/pe/pe.cpp|s#^  if (loads_done_\[s\] < 2) return;#  if (false) return;  // MUTANT N4 feed ignores loads#|sim.Phase2.T4_DoubleBufferedMemoryBound functional.gemm20"
-  "N5|src/pe/pe.cpp|s#return f >= 0 \&\& static_cast<Cycle>(f) + cfg_.kt <= now;#return f >= 0 \&\& static_cast<Cycle>(f) <= now;  // MUTANT N5 freed at feed start#|sim.Phase2.T3_SingleBuffer"
+  "N5|src/pe/pe.cpp|s#return f >= 0 \&\& static_cast<Cycle>(f) + cfg_.kt <= now;#return f >= 0 \&\& static_cast<Cycle>(f) <= now;  // MUTANT N5 freed at feed start#|sim.Phase2.T2_DoubleBufferedComputeBound"
   "N6|src/pe/pe.cpp|s#^    if (tile_in_array_) return;.*#    // MUTANT N6 next tile does not wait for the drain#|sim.Phase2.T5_TwoOutputTiles"
   "N7|src/pe/pe.cpp|s#^    if (t >= cfg_.n_out \&\& store_done_\[t - cfg_.n_out\] < 0) return;.*#    // MUTANT N7 output buffer rule ignored#|sim.Phase2.T5b_OneOutputBuffer"
   "N8|src/pe/gemm_layout.cpp|s#const std::uint64_t blk = b_block_addr(nj, c) - b_base;#const std::uint64_t blk = b_block_addr(nj, (c + 1) % chunks()) - b_base;  // MUTANT N8 B blocks permuted#|functional.gemm20"

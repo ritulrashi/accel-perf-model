@@ -329,7 +329,7 @@ tests/sim/phase2_test.cpp        P2-T1..T7 (one simulation per process)
 | N2 | Accumulator overwrites instead of adds | functional (any nc>1 case) |
 | N3 | DMA back to one descriptor at a time | P2-T6, P2-T2 |
 | N4 | Feed does not wait for its loads | P2-T4, functional |
-| N5 | Operand buffer freed at feed start (not end) | P2-T3 |
+| N5 | Operand buffer freed at feed start (not end) | P2-T2. The draft said P2-T3, which was wrong: see BUGS #5. With one buffer, the load for step s+1 is evaluated before step s starts feeding in the same wake-up, so the early free time is never acted on. |
 | N6 | Next tile does not wait for the previous drain | P2-T5 |
 | N7 | Output buffer rule ignored | P2-T5b |
 | N8 | Packing swaps two B blocks | functional only (timing unchanged) |
