@@ -11,9 +11,16 @@ comparison also tells which side is wrong when one disagrees.
     python3 python/gemm_check.py --target accel --apm-accel build/release/apm_accel \
         --gemm-ref build/release/gemm_ref --cases 100 [--csv out.csv]
 
+    # Phase 4: precision modes on the grid (design note §8.2), cases split
+    # evenly over int8, fp16, bf16, fp32
+    python3 python/gemm_check.py --target accel --prec all --apm-accel build/release/apm_accel         --gemm-ref build/release/gemm_ref --cases 200 [--csv out.csv]
+
 Case i draws everything from numpy.random.default_rng([SEED, i]) (Phase 3:
-[SEED, ACCEL_STREAM, i]); the seeds are fixed, so the case list is
-reproducible. Exit status 0 only if every case matches all three ways.
+[SEED, ACCEL_STREAM, i]; Phase 4: [SEED, PREC_STREAM, precision index, i]);
+the seeds are fixed, so the case list is reproducible. Floating-point cases
+use FP32 N(0,1) operands (10 % scaled by 1000) rounded once to the mode and
+compare 4-byte words: FP32 bit patterns, accumulated per design note §2.2.
+Exit status 0 only if every case matches all three ways.
 """
 import argparse
 import csv
@@ -25,8 +32,12 @@ import tempfile
 
 import numpy as np
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import numerics as nx  # noqa: E402
+
 SEED = 20261014
 ACCEL_STREAM = 3  # separate stream so Phase 2 cases stay exactly as published
+PREC_STREAM = 5   # Phase 4 precision cases (Phase 3 INT8 cases stay exactly as published)
 
 
 def draw_operands(rng, m, n, k):
@@ -55,8 +66,8 @@ def draw_case_pe(i):
     return p, a, b
 
 
-def draw_case_accel(i):
-    rng = np.random.default_rng([SEED, ACCEL_STREAM, i])
+def draw_case_accel(i, rng=None):
+    rng = np.random.default_rng([SEED, ACCEL_STREAM, i]) if rng is None else rng
     px, py = [(1, 1), (1, 2), (2, 2), (2, 3)][int(rng.integers(0, 4))]
     r = int(rng.choice([1, 2, 4]))
     c = int(rng.choice([4, 16]))
@@ -78,6 +89,56 @@ def numpy_ref(a, b):
     info = np.iinfo(np.int32)
     assert c64.min() >= info.min and c64.max() <= info.max, "reference overflows INT32"
     return c64.astype(np.int32)
+
+
+def draw_case_prec(prec, i):
+    """Phase 4: a grid case in precision `prec` (shapes as Phase 3, own stream)."""
+    rng = np.random.default_rng([SEED, PREC_STREAM, nx.PRECS.index(prec), i])
+    p, a, b = draw_case_accel(i, rng)
+    p["prec"] = prec
+    if prec == "int8":
+        return p, a, b
+    large = bool(rng.random() < 0.1)
+    scale = np.float32(1000.0) if large else np.float32(1.0)
+    af = rng.standard_normal(a.shape, dtype=np.float32) * scale
+    bf = rng.standard_normal(b.shape, dtype=np.float32) * scale
+    p["extreme"] = large
+    return p, nx.encode(prec, af), nx.encode(prec, bf)
+
+
+def run_case_prec(i, prec, model, gemm_ref, tmp):
+    p, a, b = draw_case_prec(prec, i)
+    keys = ("M", "N", "K", "R", "C", "Kt", "px", "py", "sram_x", "sram_y", "D", "nbuf", "nout")
+    fa, fb = os.path.join(tmp, "a.bin"), os.path.join(tmp, "b.bin")
+    fc_model, fc_ref = os.path.join(tmp, "c_model.bin"), os.path.join(tmp, "c_ref.bin")
+    raw_a = a.view(np.uint8) if prec == "int8" else a
+    raw_b = b.view(np.uint8) if prec == "int8" else b
+    raw_a.tofile(fa)
+    raw_b.tofile(fb)
+    env = dict(os.environ, SYSTEMC_DISABLE_COPYRIGHT_MESSAGE="1")
+    args = [model] + [f"{k}={p[k]}" for k in keys] + [f"prec={prec}", f"a={fa}", f"b={fb}", f"out={fc_model}"]
+    pm = subprocess.run(args, capture_output=True, text=True, env=env)
+    if pm.returncode != 0:
+        raise RuntimeError(f"case {prec}/{i}: model failed ({pm.returncode}): {pm.stderr.strip()}")
+    cycles = json.loads(pm.stdout)["values"]["t_end"]
+    pr = subprocess.run([gemm_ref, str(p["M"]), str(p["N"]), str(p["K"]), fa, fb, fc_ref, prec],
+                        capture_output=True, text=True)
+    if pr.returncode != 0:
+        raise RuntimeError(f"case {prec}/{i}: gemm_ref failed: {pr.stderr.strip()}")
+    shape = (p["M"], p["N"])
+    c_model = np.fromfile(fc_model, dtype="<u4").reshape(shape)
+    c_cpp = np.fromfile(fc_ref, dtype="<u4").reshape(shape)
+    if prec == "int8":
+        c_np = numpy_ref(a, b).view(np.uint32)
+    else:
+        c_np = np.asarray(nx.gemm(prec, nx.decode(prec, a), nx.decode(prec, b))).view(np.uint32)
+    p.update(cycles=cycles,
+             model_eq_numpy=bool(np.array_equal(c_model, c_np)),
+             cpp_eq_numpy=bool(np.array_equal(c_cpp, c_np)),
+             model_eq_cpp=bool(np.array_equal(c_model, c_cpp)),
+             model_mismatches=int(np.count_nonzero(c_model != c_np)))
+    p["match"] = p["model_eq_numpy"] and p["cpp_eq_numpy"] and p["model_eq_cpp"]
+    return p
 
 
 def run_case(i, target, model, gemm_ref, tmp):
@@ -123,16 +184,24 @@ def main():
     ap.add_argument("--apm-accel")
     ap.add_argument("--gemm-ref", required=True)
     ap.add_argument("--cases", type=int, default=200)
+    ap.add_argument("--prec", choices=nx.PRECS + ("all",),
+                    help="Phase 4 precision cases on the grid (default: the Phase 2/3 INT8 streams)")
     ap.add_argument("--csv")
     args = ap.parse_args()
+    if args.prec and args.target != "accel":
+        ap.error("--prec needs --target accel")
     model = args.apm_gemm if args.target == "pe" else args.apm_accel
     if not model:
         ap.error(f"--target {args.target} needs --apm-{'gemm' if args.target == 'pe' else 'accel'}")
 
     rows = []
     with tempfile.TemporaryDirectory() as tmp:
+        precs = None if not args.prec else (nx.PRECS if args.prec == "all" else (args.prec,))
         for i in range(args.cases):
-            row = run_case(i, args.target, model, args.gemm_ref, tmp)
+            if precs:
+                row = run_case_prec(i // len(precs), precs[i % len(precs)], model, args.gemm_ref, tmp)
+            else:
+                row = run_case(i, args.target, model, args.gemm_ref, tmp)
             rows.append(row)
             shape = " ".join(f"{k}={row[k]}" for k in row
                              if k not in ("case", "extreme", "cycles", "model_eq_numpy", "cpp_eq_numpy",
@@ -147,6 +216,10 @@ def main():
             w.writeheader()
             w.writerows(rows)
     ok = sum(r["match"] for r in rows)
+    if precs:
+        for pr in precs:
+            rs = [r for r in rows if r["prec"] == pr]
+            print(f"functional: prec={pr} cases={len(rs)} all_three_agree={sum(r['match'] for r in rs)}")
     print(f"functional: target={args.target} seed={SEED} cases={len(rows)} all_three_agree={ok} "
           f"model_wrong={sum(not r['model_eq_numpy'] for r in rows)} "
           f"cpp_ref_wrong={sum(not r['cpp_eq_numpy'] for r in rows)} "

@@ -133,3 +133,13 @@ add_test(NAME functional.accel20
   COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/python/gemm_check.py --target accel
           --apm-accel $<TARGET_FILE:apm_accel> --gemm-ref $<TARGET_FILE:gemm_ref> --cases 20)
 set_tests_properties(functional.accel20 PROPERTIES LABELS functional)
+# Phase 4: precision modes on the grid (5 cases per precision; the exit
+# script runs 200) and the attention program, model vs NumPy replica vs
+# attn_ref (one case of each mode x precision combination; the exit script runs 80).
+add_test(NAME functional.accel_prec20
+  COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/python/gemm_check.py --target accel --prec all
+          --apm-accel $<TARGET_FILE:apm_accel> --gemm-ref $<TARGET_FILE:gemm_ref> --cases 20)
+add_test(NAME functional.attn10
+  COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/python/attn_check.py
+          --tools $<TARGET_FILE_DIR:apm_op> --cases 10)
+set_tests_properties(functional.accel_prec20 functional.attn10 PROPERTIES LABELS functional)

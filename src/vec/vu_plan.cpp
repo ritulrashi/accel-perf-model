@@ -44,8 +44,9 @@ TileDesc vu_load(const VuJob& j, std::uint64_t vmem_dst, std::uint64_t row) {
 TileDesc vu_store(const VuJob& j, std::uint64_t vmem_src, std::uint64_t row) {
   const std::uint64_t seg = j.kt * j.elem();
   const std::uint64_t mi = row / j.r_pack, i = row % j.r_pack;
-  return {DmaDir::SramToDram, vmem_src, j.p_base + (mi * j.chunks() * j.r_pack + i) * seg,
-          static_cast<std::uint32_t>(j.chunks()), seg, seg, j.r_pack * seg};
+  // Segment c of the row lands at dst + c * stride (packed A layout, §3.3).
+  const std::uint64_t dst = j.p_base + (mi * j.chunks() * j.r_pack + i) * seg, stride = j.r_pack * seg;
+  return {DmaDir::SramToDram, vmem_src, dst, static_cast<std::uint32_t>(j.chunks()), seg, seg, stride};
 }
 
 TileDesc vu_scale_store(const VuJob& j, std::uint64_t vmem_src) {

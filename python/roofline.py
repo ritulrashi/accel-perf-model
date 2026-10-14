@@ -16,6 +16,14 @@ an independent hand calculation of what the model should be able to reach.
                   (ties resolved in the order compute, dram, noc)
 
 All arithmetic is exact (fractions.Fraction).
+
+Phase 4 (design note §6) adds optional keys, absent = Phase 3 behaviour:
+  e (operand bytes), q (cycles per reduction step), m_valid (valid rows;
+  ops count useful rows only, C bytes valid rows only), px_map/py_map
+  (logical mapping; PE id x'*py_map + y' sits at physical node
+  (id // py, id % py)). Peak = 2*P*R*C/q. It also adds the vector unit's two
+  ceilings and per-op lower bounds on cycles (bounds()), used by the Phase 4
+  studies: no run can finish faster than its compute, DRAM, NoC or VU time.
 """
 from collections import defaultdict
 from fractions import Fraction
@@ -26,33 +34,37 @@ def _ceil_div(a, b):
 
 
 def plan(cfg):
-    """Mapping counts for one configuration (design note §2.1-2.2)."""
+    """Mapping counts for one configuration (design note §2.1-2.2; Phase 4 §5)."""
     m, n, k = cfg["M"], cfg["N"], cfg["K"]
     r, c, kt = cfg["R"], cfg["C"], cfg["Kt"]
     px, py = cfg["px"], cfg["py"]
+    mx, my = cfg.get("px_map") or px, cfg.get("py_map") or py
+    e = cfg.get("e", 1)
+    m_valid = cfg.get("m_valid") or m
     tiles_m, tiles_n, nc = m // r, n // c, k // kt
-    waves_m, waves_n = _ceil_div(tiles_m, px), _ceil_div(tiles_n, py)
+    waves_m, waves_n = _ceil_div(tiles_m, mx), _ceil_div(tiles_n, my)
     staged = 0
-    tiles_of = defaultdict(int)  # (x, y) -> tiles
+    tiles_of = defaultdict(int)  # physical (x, y) -> tiles
     for bm in range(waves_m):
         for bn in range(waves_n):
-            rows = min(px, tiles_m - bm * px)
-            cols = min(py, tiles_n - bn * py)
-            staged += nc * (rows * r * kt + cols * kt * c)
+            rows = min(mx, tiles_m - bm * mx)
+            cols = min(my, tiles_n - bn * my)
+            staged += nc * (rows * r * kt + cols * kt * c) * e
             for x in range(rows):
                 for y in range(cols):
-                    tiles_of[(x, y)] += 1
+                    pe = x * my + y
+                    tiles_of[(pe // py, pe % py)] += 1
     return {
         "tiles_of": dict(tiles_of),
-        "dram_bytes": staged + 4 * m * n,
-        "full_waves": tiles_m % px == 0 and tiles_n % py == 0,
+        "dram_bytes": staged + 4 * m_valid * n,
+        "full_waves": tiles_m % mx == 0 and tiles_n % my == 0,
     }
 
 
 def busiest_link_load_bytes(cfg, tiles_of):
     """Max operand-load bytes on one directed link, XY routing from sram_node."""
     sx, sy = cfg["sram_x"], cfg["sram_y"]
-    per_tile = cfg["K"] * (cfg["R"] + cfg["C"])  # every chunk loads R*Kt + Kt*C
+    per_tile = cfg["K"] * (cfg["R"] + cfg["C"]) * cfg.get("e", 1)  # every chunk loads (R*Kt + Kt*C)*e
     load = defaultdict(int)
     for (x, y), tiles in tiles_of.items():
         bytes_ = tiles * per_tile
@@ -70,8 +82,8 @@ def busiest_link_load_bytes(cfg, tiles_of):
 
 def ceilings(cfg):
     p = plan(cfg)
-    ops = 2 * cfg["M"] * cfg["N"] * cfg["K"]
-    peak = Fraction(2 * cfg["px"] * cfg["py"] * cfg["R"] * cfg["C"])
+    ops = 2 * (cfg.get("m_valid") or cfg["M"]) * cfg["N"] * cfg["K"]
+    peak = Fraction(2 * cfg["px"] * cfg["py"] * cfg["R"] * cfg["C"], cfg.get("q", 1))
     dram = Fraction(ops * cfg["W"], p["dram_bytes"])
     b_max = busiest_link_load_bytes(cfg, p["tiles_of"])
     noc = Fraction(ops * cfg["L"], b_max) if b_max else None
@@ -89,6 +101,36 @@ def ceilings(cfg):
         "attainable": attainable,
         "predicted": region,
     }
+
+
+def gemm_bounds(cfg):
+    """Lower bounds on a GEMM op's cycles (Phase 4 §6, §10): the busiest PE's
+    compute (its tiles x (nc*q*Kt + F)), DRAM bytes / W, busiest-link bytes / L."""
+    p = plan(cfg)
+    nc = cfg["K"] // cfg["Kt"]
+    f = 2 * cfg["R"] + cfg["C"] - 2
+    compute = max(p["tiles_of"].values()) * (nc * cfg.get("q", 1) * cfg["Kt"] + f)
+    b_max = busiest_link_load_bytes(cfg, p["tiles_of"])
+    return {"compute": Fraction(compute), "dram": Fraction(p["dram_bytes"], cfg["W"]),
+            "noc": Fraction(b_max, cfg["L"]), "dram_bytes": p["dram_bytes"]}
+
+
+def vu_row_cycles(n, lanes, t_vu):
+    return 3 * (_ceil_div(n, lanes) + t_vu)
+
+
+def vu_bounds(rows, n, e, lanes, t_vu, w, scale_bytes=0):
+    """Lower bounds on a VU op's cycles: rows * T_row, and DRAM bytes / W."""
+    dram_bytes = rows * n * (4 + e) + scale_bytes
+    return {"compute": Fraction(rows * vu_row_cycles(n, lanes, t_vu)), "dram": Fraction(dram_bytes, w),
+            "dram_bytes": dram_bytes}
+
+
+def vu_ceilings(n, e, lanes, t_vu, w):
+    """VU ceilings in elements/cycle: the unit (n / T_row) and DRAM (W / (4 + e))."""
+    vu = Fraction(n, vu_row_cycles(n, lanes, t_vu))
+    dram = Fraction(w, 4 + e)
+    return {"vu_ceil": vu, "dram_ceil": dram, "attainable": min(vu, dram), "predicted": "vu" if vu < dram else "dram"}
 
 
 if __name__ == "__main__":
