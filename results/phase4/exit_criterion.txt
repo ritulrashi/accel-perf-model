@@ -1,0 +1,593 @@
+# Phase 4 exit criterion: precision modes, vector unit, attention workloads
+command: scripts/phase4_exit.sh
+
+## Provenance
+date_utc: 2026-10-14T19:42:00Z
+commit: 84a082a6e02801c3d0dbca8da5f21938fe046bd0
+tree: clean
+host: Linux 6.8.0-1064-azure x86_64
+os: Ubuntu 24.04.3 LTS
+lscpu:
+  Architecture:                            x86_64
+  CPU(s):                                  2
+  Model name:                              AMD EPYC 7763 64-Core Processor
+  Thread(s) per core:                      2
+  Core(s) per socket:                      1
+  Socket(s):                               1
+  L1d cache:                               32 KiB (1 instance)
+  L1i cache:                               32 KiB (1 instance)
+  L2 cache:                                512 KiB (1 instance)
+  L3 cache:                                32 MiB (1 instance)
+mem_total: 8132888 kB
+tools:
+  c++: c++ (Ubuntu 13.3.0-6ubuntu2~24.04) 13.3.0
+  cmake: cmake version 3.28.3
+  ninja: 1.11.1
+  systemc: 3.0.2 (release date 20251031) at /opt/systemc-3.0.2, commit 70b0fc8e4a74acc677b0fc73cea08f940c2115d5
+  googletest: 52eb8108c5bdec04579160ae17225d66034bd723  # v1.17.0
+  python3: Python 3.12.3
+  numpy: 1.26.4
+  verilator: Verilator 5.020 2024-01-01 rev (Debian 5.020-1)
+
+## Preset: asan
+### Expected vs measured (hand derivations: Phase 1 §6, Phase 2 §5, Phase 3 §5, Phase 4 §7)
+count: F2D_DramToSramStrided dma0.d0.bursts expected=8 measured=8
+count: F2D_SramToDramStrided dma0.d0.bursts expected=8 measured=8
+count: T1_Fp16 dram_bytes expected=2816 measured=2816
+count: T1_Fp16 pe0.stall.compute expected=150 measured=150
+count: T1_Fp16 pe0.stall.dma expected=47 measured=47
+count: T1_Fp16 pe0.stall.dram expected=92 measured=92
+count: T1_Fp16 pe0.stall.idle expected=20 measured=20
+count: T1_Fp16 pe0.stall.network expected=7 measured=7
+count: T1_Fp16 pe0.stall.sram_conflict expected=0 measured=0
+count: T1_SinglePeAtSramNode pe0.stall.compute expected=86 measured=86
+count: T1_SinglePeAtSramNode pe0.stall.dma expected=27 measured=27
+count: T1_SinglePeAtSramNode pe0.stall.dram expected=52 measured=52
+count: T1_SinglePeAtSramNode pe0.stall.idle expected=20 measured=20
+count: T1_SinglePeAtSramNode pe0.stall.network expected=7 measured=7
+count: T1_SinglePeAtSramNode pe0.stall.sram_conflict expected=0 measured=0
+count: T1_SingleTransfer dma0.d0.bursts expected=4 measured=4
+count: T1_SingleTransfer dram.bus_busy_cycles expected=16 measured=16
+count: T1_SingleTransfer dram.row_hits expected=3 measured=3
+count: T1_SingleTransfer dram.row_misses expected=1 measured=1
+count: T1_SingleTransfer sram.conflict_line_cycles expected=0 measured=0
+count: T1c_ReverseDirection dram.bytes_written expected=256 measured=256
+count: T2_Fp32 dram_bytes expected=5376 measured=5376
+count: T2_Fp32 pe0.stall.compute expected=278 measured=278
+count: T2_Fp32 pe0.stall.dma expected=87 measured=87
+count: T2_Fp32 pe0.stall.dram expected=172 measured=172
+count: T2_Fp32 pe0.stall.idle expected=20 measured=20
+count: T2_Fp32 pe0.stall.network expected=7 measured=7
+count: T2_Fp32 pe0.stall.sram_conflict expected=0 measured=0
+count: T2_OneHopAndAnIdlePe pe0.stall.compute expected=86 measured=86
+count: T2_OneHopAndAnIdlePe pe0.stall.dma expected=49 measured=49
+count: T2_OneHopAndAnIdlePe pe0.stall.dram expected=52 measured=52
+count: T2_OneHopAndAnIdlePe pe0.stall.idle expected=20 measured=20
+count: T2_OneHopAndAnIdlePe pe0.stall.network expected=65 measured=65
+count: T2_OneHopAndAnIdlePe pe0.stall.sram_conflict expected=0 measured=0
+count: T2_OneHopAndAnIdlePe pe1.stall.compute expected=0 measured=0
+count: T2_OneHopAndAnIdlePe pe1.stall.dma expected=0 measured=0
+count: T2_OneHopAndAnIdlePe pe1.stall.dram expected=0 measured=0
+count: T2_OneHopAndAnIdlePe pe1.stall.idle expected=272 measured=272
+count: T2_OneHopAndAnIdlePe pe1.stall.network expected=0 measured=0
+count: T2_OneHopAndAnIdlePe pe1.stall.sram_conflict expected=0 measured=0
+count: T2_TwoDmasShareOneChannel dram.bus_busy_cycles expected=32 measured=32
+count: T2_TwoDmasShareOneChannel dram.row_hits expected=6 measured=6
+count: T2_TwoDmasShareOneChannel dram.row_misses expected=2 measured=2
+count: T2_TwoDmasShareOneChannel sram.conflict_line_cycles expected=0 measured=0
+count: T2b_QueueBackpressure dram.backpressure_cycles expected=35 measured=35
+count: T3_Bf16TimingEqualsFp16 dram_bytes expected=2816 measured=2816
+count: T3_Bf16TimingEqualsFp16 pe0.stall.compute expected=150 measured=150
+count: T3_Bf16TimingEqualsFp16 pe0.stall.dma expected=47 measured=47
+count: T3_Bf16TimingEqualsFp16 pe0.stall.dram expected=92 measured=92
+count: T3_Bf16TimingEqualsFp16 pe0.stall.idle expected=20 measured=20
+count: T3_Bf16TimingEqualsFp16 pe0.stall.network expected=7 measured=7
+count: T3_Bf16TimingEqualsFp16 pe0.stall.sram_conflict expected=0 measured=0
+count: T3_Grid2x2FunctionalAndDramBytes dram_bytes expected=24576 measured=24576
+count: T3_Grid2x2FunctionalAndDramBytes full_waves expected=1 measured=1
+count: T3a_SramBankConflict sram.conflict_line_cycles expected=1 measured=1
+count: T3b_SramNoConflict sram.conflict_line_cycles expected=0 measured=0
+count: T3c_SramIntraRequestSerialization sram.conflict_line_cycles expected=0 measured=0
+count: T4_MaskedWriteBack dram_bytes expected=1344 measured=1344
+count: T4_MaskedWriteBack pe0.stall.compute expected=86 measured=86
+count: T4_MaskedWriteBack pe0.stall.dma expected=27 measured=27
+count: T4_MaskedWriteBack pe0.stall.dram expected=52 measured=52
+count: T4_MaskedWriteBack pe0.stall.idle expected=14 measured=14
+count: T4_MaskedWriteBack pe0.stall.network expected=7 measured=7
+count: T4_MaskedWriteBack pe0.stall.sram_conflict expected=0 measured=0
+count: T4a_RowHit dram.row_hits expected=1 measured=1
+count: T4b_RowMiss dram.row_misses expected=2 measured=2
+count: V1_Fp16 vu.busy expected=48 measured=48
+count: V1_Fp16 vu.load expected=20 measured=20
+count: V1_Fp16 vu.store expected=16 measured=16
+count: V2_TwoSegments vu.busy expected=36 measured=36
+count: V2_TwoSegments vu.load expected=28 measured=28
+count: V2_TwoSegments vu.store expected=20 measured=20
+cycles: T1_Fp16 t_end expected=316 measured=316
+cycles: T1_OneTileOneChunk pe.done expected=158 measured=158
+cycles: T1_OneTileOneChunk pe.s0.feed expected=52 measured=52
+cycles: T1_OneTileOneChunk pe.s0.loaded expected=52 measured=52
+cycles: T1_OneTileOneChunk pe.t0.done expected=138 measured=138
+cycles: T1_SinglePeAtSramNode t_end expected=192 measured=192
+cycles: T1_SingleTransfer dma0.d0.done expected=48 measured=48
+cycles: T1b_OneBufferIsLatencyBound dma0.d0.done expected=84 measured=84
+cycles: T1c_ReverseDirection dma0.d0.done expected=48 measured=48
+cycles: T2_DoubleBufferedComputeBound pe.done expected=350 measured=350
+cycles: T2_DoubleBufferedComputeBound pe.s0.feed expected=52 measured=52
+cycles: T2_DoubleBufferedComputeBound pe.s0.loaded expected=52 measured=52
+cycles: T2_DoubleBufferedComputeBound pe.s1.feed expected=116 measured=116
+cycles: T2_DoubleBufferedComputeBound pe.s1.loaded expected=92 measured=92
+cycles: T2_DoubleBufferedComputeBound pe.s2.feed expected=180 measured=180
+cycles: T2_DoubleBufferedComputeBound pe.s2.loaded expected=168 measured=168
+cycles: T2_DoubleBufferedComputeBound pe.s3.feed expected=244 measured=244
+cycles: T2_DoubleBufferedComputeBound pe.s3.loaded expected=232 measured=232
+cycles: T2_DoubleBufferedComputeBound pe.t0.done expected=330 measured=330
+cycles: T2_Fp32 t_end expected=564 measured=564
+cycles: T2_OneHopAndAnIdlePe t_end expected=272 measured=272
+cycles: T2_TwoDmasShareOneChannel dma0.d0.done expected=64 measured=64
+cycles: T2_TwoDmasShareOneChannel dma1.d0.done expected=60 measured=60
+cycles: T2b_QueueBackpressure dma0.d0.done expected=54 measured=54
+cycles: T3_Bf16TimingEqualsFp16 t_end expected=316 measured=316
+cycles: T3_SingleBuffer pe.done expected=506 measured=506
+cycles: T3_SingleBuffer pe.s0.feed expected=52 measured=52
+cycles: T3_SingleBuffer pe.s0.loaded expected=52 measured=52
+cycles: T3_SingleBuffer pe.s1.feed expected=168 measured=168
+cycles: T3_SingleBuffer pe.s1.loaded expected=168 measured=168
+cycles: T3_SingleBuffer pe.s2.feed expected=284 measured=284
+cycles: T3_SingleBuffer pe.s2.loaded expected=284 measured=284
+cycles: T3_SingleBuffer pe.s3.feed expected=400 measured=400
+cycles: T3_SingleBuffer pe.s3.loaded expected=400 measured=400
+cycles: T3_SingleBuffer pe.t0.done expected=486 measured=486
+cycles: T3a_SramBankConflict tgs0.r0.response expected=2 measured=2
+cycles: T3a_SramBankConflict tgs1.r0.response expected=3 measured=3
+cycles: T3b_SramNoConflict tgs0.r0.response expected=2 measured=2
+cycles: T3b_SramNoConflict tgs1.r0.response expected=2 measured=2
+cycles: T3c_SramIntraRequestSerialization tgs0.r0.response expected=3 measured=3
+cycles: T4_DoubleBufferedMemoryBound pe.done expected=446 measured=446
+cycles: T4_DoubleBufferedMemoryBound pe.s0.feed expected=92 measured=92
+cycles: T4_DoubleBufferedMemoryBound pe.s0.loaded expected=92 measured=92
+cycles: T4_DoubleBufferedMemoryBound pe.s1.feed expected=172 measured=172
+cycles: T4_DoubleBufferedMemoryBound pe.s1.loaded expected=172 measured=172
+cycles: T4_DoubleBufferedMemoryBound pe.s2.feed expected=252 measured=252
+cycles: T4_DoubleBufferedMemoryBound pe.s2.loaded expected=252 measured=252
+cycles: T4_DoubleBufferedMemoryBound pe.s3.feed expected=332 measured=332
+cycles: T4_DoubleBufferedMemoryBound pe.s3.loaded expected=332 measured=332
+cycles: T4_DoubleBufferedMemoryBound pe.t0.done expected=418 measured=418
+cycles: T4_MaskedWriteBack t_end expected=186 measured=186
+cycles: T4a_RowHit tgd0.r0.response expected=34 measured=34
+cycles: T4a_RowHit tgd0.r1.issued expected=100 measured=100
+cycles: T4a_RowHit tgd0.r1.response expected=114 measured=114
+cycles: T4b_RowMiss tgd0.r0.response expected=34 measured=34
+cycles: T4b_RowMiss tgd0.r1.issued expected=100 measured=100
+cycles: T4b_RowMiss tgd0.r1.response expected=134 measured=134
+cycles: T4c_SameBankBackToBack tgd0.r0.response expected=34 measured=34
+cycles: T4c_SameBankBackToBack tgd0.r1.issued expected=1 measured=1
+cycles: T4c_SameBankBackToBack tgd0.r1.response expected=58 measured=58
+cycles: T4d_OtherBankBackToBack tgd0.r0.response expected=34 measured=34
+cycles: T4d_OtherBankBackToBack tgd0.r1.issued expected=1 measured=1
+cycles: T4d_OtherBankBackToBack tgd0.r1.response expected=38 measured=38
+cycles: T5_TwoOutputTiles pe.done expected=244 measured=244
+cycles: T5_TwoOutputTiles pe.s0.feed expected=52 measured=52
+cycles: T5_TwoOutputTiles pe.s0.loaded expected=52 measured=52
+cycles: T5_TwoOutputTiles pe.s1.feed expected=138 measured=138
+cycles: T5_TwoOutputTiles pe.s1.loaded expected=92 measured=92
+cycles: T5_TwoOutputTiles pe.t0.done expected=138 measured=138
+cycles: T5_TwoOutputTiles pe.t0.store_done expected=158 measured=158
+cycles: T5_TwoOutputTiles pe.t1.done expected=224 measured=224
+cycles: T5b_OneOutputBuffer pe.done expected=264 measured=264
+cycles: T5b_OneOutputBuffer pe.s1.feed expected=158 measured=158
+cycles: T5b_OneOutputBuffer pe.t0.store_done expected=158 measured=158
+cycles: T5b_OneOutputBuffer pe.t1.done expected=244 measured=244
+cycles: T6_DmaStreamsAcrossDescriptors dma0.d0.done expected=20 measured=20
+cycles: T6_DmaStreamsAcrossDescriptors dma0.d1.done expected=28 measured=28
+cycles: T7_ExactCapacityStillRuns pe.done expected=158 measured=158
+cycles: V1_Fp16 t_end expected=84 measured=84
+cycles: V1_Fp32 t_end expected=88 measured=88
+cycles: V1_Int8Fixed t_end expected=82 measured=82
+cycles: V2_TwoSegments t_end expected=84 measured=84
+### Mismatches
+none
+### Summary
+100% tests passed, 0 tests failed out of 113
+determinism    =   0.28 sec*proc (2 tests)
+functional     =   6.14 sec*proc (4 tests)
+sim            =   1.31 sec*proc (33 tests)
+unit           =   1.95 sec*proc (74 tests)
+determinism: M=16;N=96;K=256;R=4;C=16;Kt=64;px=2;py=3;sram_x=1;sram_y=1;seed=3 identical over 2 runs
+determinism: t2 identical over 2 runs
+ctest quick functional: target=pe seed=20261014 cases=20 all_three_agree=20 model_wrong=0 cpp_ref_wrong=0 extreme_cases=1
+ctest quick functional: target=accel seed=20261014 cases=20 all_three_agree=20 model_wrong=0 cpp_ref_wrong=0 extreme_cases=4
+ctest quick functional: target=accel seed=20261014 cases=20 all_three_agree=20 model_wrong=0 cpp_ref_wrong=0 extreme_cases=2
+ctest quick attention functional: seed=20261014 cases=10 all_three_agree=10 model_wrong=0 cpp_ref_wrong=0
+failed tests: none
+
+## Preset: release
+### Expected vs measured (hand derivations: Phase 1 §6, Phase 2 §5, Phase 3 §5, Phase 4 §7)
+count: F2D_DramToSramStrided dma0.d0.bursts expected=8 measured=8
+count: F2D_SramToDramStrided dma0.d0.bursts expected=8 measured=8
+count: T1_Fp16 dram_bytes expected=2816 measured=2816
+count: T1_Fp16 pe0.stall.compute expected=150 measured=150
+count: T1_Fp16 pe0.stall.dma expected=47 measured=47
+count: T1_Fp16 pe0.stall.dram expected=92 measured=92
+count: T1_Fp16 pe0.stall.idle expected=20 measured=20
+count: T1_Fp16 pe0.stall.network expected=7 measured=7
+count: T1_Fp16 pe0.stall.sram_conflict expected=0 measured=0
+count: T1_SinglePeAtSramNode pe0.stall.compute expected=86 measured=86
+count: T1_SinglePeAtSramNode pe0.stall.dma expected=27 measured=27
+count: T1_SinglePeAtSramNode pe0.stall.dram expected=52 measured=52
+count: T1_SinglePeAtSramNode pe0.stall.idle expected=20 measured=20
+count: T1_SinglePeAtSramNode pe0.stall.network expected=7 measured=7
+count: T1_SinglePeAtSramNode pe0.stall.sram_conflict expected=0 measured=0
+count: T1_SingleTransfer dma0.d0.bursts expected=4 measured=4
+count: T1_SingleTransfer dram.bus_busy_cycles expected=16 measured=16
+count: T1_SingleTransfer dram.row_hits expected=3 measured=3
+count: T1_SingleTransfer dram.row_misses expected=1 measured=1
+count: T1_SingleTransfer sram.conflict_line_cycles expected=0 measured=0
+count: T1c_ReverseDirection dram.bytes_written expected=256 measured=256
+count: T2_Fp32 dram_bytes expected=5376 measured=5376
+count: T2_Fp32 pe0.stall.compute expected=278 measured=278
+count: T2_Fp32 pe0.stall.dma expected=87 measured=87
+count: T2_Fp32 pe0.stall.dram expected=172 measured=172
+count: T2_Fp32 pe0.stall.idle expected=20 measured=20
+count: T2_Fp32 pe0.stall.network expected=7 measured=7
+count: T2_Fp32 pe0.stall.sram_conflict expected=0 measured=0
+count: T2_OneHopAndAnIdlePe pe0.stall.compute expected=86 measured=86
+count: T2_OneHopAndAnIdlePe pe0.stall.dma expected=49 measured=49
+count: T2_OneHopAndAnIdlePe pe0.stall.dram expected=52 measured=52
+count: T2_OneHopAndAnIdlePe pe0.stall.idle expected=20 measured=20
+count: T2_OneHopAndAnIdlePe pe0.stall.network expected=65 measured=65
+count: T2_OneHopAndAnIdlePe pe0.stall.sram_conflict expected=0 measured=0
+count: T2_OneHopAndAnIdlePe pe1.stall.compute expected=0 measured=0
+count: T2_OneHopAndAnIdlePe pe1.stall.dma expected=0 measured=0
+count: T2_OneHopAndAnIdlePe pe1.stall.dram expected=0 measured=0
+count: T2_OneHopAndAnIdlePe pe1.stall.idle expected=272 measured=272
+count: T2_OneHopAndAnIdlePe pe1.stall.network expected=0 measured=0
+count: T2_OneHopAndAnIdlePe pe1.stall.sram_conflict expected=0 measured=0
+count: T2_TwoDmasShareOneChannel dram.bus_busy_cycles expected=32 measured=32
+count: T2_TwoDmasShareOneChannel dram.row_hits expected=6 measured=6
+count: T2_TwoDmasShareOneChannel dram.row_misses expected=2 measured=2
+count: T2_TwoDmasShareOneChannel sram.conflict_line_cycles expected=0 measured=0
+count: T2b_QueueBackpressure dram.backpressure_cycles expected=35 measured=35
+count: T3_Bf16TimingEqualsFp16 dram_bytes expected=2816 measured=2816
+count: T3_Bf16TimingEqualsFp16 pe0.stall.compute expected=150 measured=150
+count: T3_Bf16TimingEqualsFp16 pe0.stall.dma expected=47 measured=47
+count: T3_Bf16TimingEqualsFp16 pe0.stall.dram expected=92 measured=92
+count: T3_Bf16TimingEqualsFp16 pe0.stall.idle expected=20 measured=20
+count: T3_Bf16TimingEqualsFp16 pe0.stall.network expected=7 measured=7
+count: T3_Bf16TimingEqualsFp16 pe0.stall.sram_conflict expected=0 measured=0
+count: T3_Grid2x2FunctionalAndDramBytes dram_bytes expected=24576 measured=24576
+count: T3_Grid2x2FunctionalAndDramBytes full_waves expected=1 measured=1
+count: T3a_SramBankConflict sram.conflict_line_cycles expected=1 measured=1
+count: T3b_SramNoConflict sram.conflict_line_cycles expected=0 measured=0
+count: T3c_SramIntraRequestSerialization sram.conflict_line_cycles expected=0 measured=0
+count: T4_MaskedWriteBack dram_bytes expected=1344 measured=1344
+count: T4_MaskedWriteBack pe0.stall.compute expected=86 measured=86
+count: T4_MaskedWriteBack pe0.stall.dma expected=27 measured=27
+count: T4_MaskedWriteBack pe0.stall.dram expected=52 measured=52
+count: T4_MaskedWriteBack pe0.stall.idle expected=14 measured=14
+count: T4_MaskedWriteBack pe0.stall.network expected=7 measured=7
+count: T4_MaskedWriteBack pe0.stall.sram_conflict expected=0 measured=0
+count: T4a_RowHit dram.row_hits expected=1 measured=1
+count: T4b_RowMiss dram.row_misses expected=2 measured=2
+count: V1_Fp16 vu.busy expected=48 measured=48
+count: V1_Fp16 vu.load expected=20 measured=20
+count: V1_Fp16 vu.store expected=16 measured=16
+count: V2_TwoSegments vu.busy expected=36 measured=36
+count: V2_TwoSegments vu.load expected=28 measured=28
+count: V2_TwoSegments vu.store expected=20 measured=20
+cycles: T1_Fp16 t_end expected=316 measured=316
+cycles: T1_OneTileOneChunk pe.done expected=158 measured=158
+cycles: T1_OneTileOneChunk pe.s0.feed expected=52 measured=52
+cycles: T1_OneTileOneChunk pe.s0.loaded expected=52 measured=52
+cycles: T1_OneTileOneChunk pe.t0.done expected=138 measured=138
+cycles: T1_SinglePeAtSramNode t_end expected=192 measured=192
+cycles: T1_SingleTransfer dma0.d0.done expected=48 measured=48
+cycles: T1b_OneBufferIsLatencyBound dma0.d0.done expected=84 measured=84
+cycles: T1c_ReverseDirection dma0.d0.done expected=48 measured=48
+cycles: T2_DoubleBufferedComputeBound pe.done expected=350 measured=350
+cycles: T2_DoubleBufferedComputeBound pe.s0.feed expected=52 measured=52
+cycles: T2_DoubleBufferedComputeBound pe.s0.loaded expected=52 measured=52
+cycles: T2_DoubleBufferedComputeBound pe.s1.feed expected=116 measured=116
+cycles: T2_DoubleBufferedComputeBound pe.s1.loaded expected=92 measured=92
+cycles: T2_DoubleBufferedComputeBound pe.s2.feed expected=180 measured=180
+cycles: T2_DoubleBufferedComputeBound pe.s2.loaded expected=168 measured=168
+cycles: T2_DoubleBufferedComputeBound pe.s3.feed expected=244 measured=244
+cycles: T2_DoubleBufferedComputeBound pe.s3.loaded expected=232 measured=232
+cycles: T2_DoubleBufferedComputeBound pe.t0.done expected=330 measured=330
+cycles: T2_Fp32 t_end expected=564 measured=564
+cycles: T2_OneHopAndAnIdlePe t_end expected=272 measured=272
+cycles: T2_TwoDmasShareOneChannel dma0.d0.done expected=64 measured=64
+cycles: T2_TwoDmasShareOneChannel dma1.d0.done expected=60 measured=60
+cycles: T2b_QueueBackpressure dma0.d0.done expected=54 measured=54
+cycles: T3_Bf16TimingEqualsFp16 t_end expected=316 measured=316
+cycles: T3_SingleBuffer pe.done expected=506 measured=506
+cycles: T3_SingleBuffer pe.s0.feed expected=52 measured=52
+cycles: T3_SingleBuffer pe.s0.loaded expected=52 measured=52
+cycles: T3_SingleBuffer pe.s1.feed expected=168 measured=168
+cycles: T3_SingleBuffer pe.s1.loaded expected=168 measured=168
+cycles: T3_SingleBuffer pe.s2.feed expected=284 measured=284
+cycles: T3_SingleBuffer pe.s2.loaded expected=284 measured=284
+cycles: T3_SingleBuffer pe.s3.feed expected=400 measured=400
+cycles: T3_SingleBuffer pe.s3.loaded expected=400 measured=400
+cycles: T3_SingleBuffer pe.t0.done expected=486 measured=486
+cycles: T3a_SramBankConflict tgs0.r0.response expected=2 measured=2
+cycles: T3a_SramBankConflict tgs1.r0.response expected=3 measured=3
+cycles: T3b_SramNoConflict tgs0.r0.response expected=2 measured=2
+cycles: T3b_SramNoConflict tgs1.r0.response expected=2 measured=2
+cycles: T3c_SramIntraRequestSerialization tgs0.r0.response expected=3 measured=3
+cycles: T4_DoubleBufferedMemoryBound pe.done expected=446 measured=446
+cycles: T4_DoubleBufferedMemoryBound pe.s0.feed expected=92 measured=92
+cycles: T4_DoubleBufferedMemoryBound pe.s0.loaded expected=92 measured=92
+cycles: T4_DoubleBufferedMemoryBound pe.s1.feed expected=172 measured=172
+cycles: T4_DoubleBufferedMemoryBound pe.s1.loaded expected=172 measured=172
+cycles: T4_DoubleBufferedMemoryBound pe.s2.feed expected=252 measured=252
+cycles: T4_DoubleBufferedMemoryBound pe.s2.loaded expected=252 measured=252
+cycles: T4_DoubleBufferedMemoryBound pe.s3.feed expected=332 measured=332
+cycles: T4_DoubleBufferedMemoryBound pe.s3.loaded expected=332 measured=332
+cycles: T4_DoubleBufferedMemoryBound pe.t0.done expected=418 measured=418
+cycles: T4_MaskedWriteBack t_end expected=186 measured=186
+cycles: T4a_RowHit tgd0.r0.response expected=34 measured=34
+cycles: T4a_RowHit tgd0.r1.issued expected=100 measured=100
+cycles: T4a_RowHit tgd0.r1.response expected=114 measured=114
+cycles: T4b_RowMiss tgd0.r0.response expected=34 measured=34
+cycles: T4b_RowMiss tgd0.r1.issued expected=100 measured=100
+cycles: T4b_RowMiss tgd0.r1.response expected=134 measured=134
+cycles: T4c_SameBankBackToBack tgd0.r0.response expected=34 measured=34
+cycles: T4c_SameBankBackToBack tgd0.r1.issued expected=1 measured=1
+cycles: T4c_SameBankBackToBack tgd0.r1.response expected=58 measured=58
+cycles: T4d_OtherBankBackToBack tgd0.r0.response expected=34 measured=34
+cycles: T4d_OtherBankBackToBack tgd0.r1.issued expected=1 measured=1
+cycles: T4d_OtherBankBackToBack tgd0.r1.response expected=38 measured=38
+cycles: T5_TwoOutputTiles pe.done expected=244 measured=244
+cycles: T5_TwoOutputTiles pe.s0.feed expected=52 measured=52
+cycles: T5_TwoOutputTiles pe.s0.loaded expected=52 measured=52
+cycles: T5_TwoOutputTiles pe.s1.feed expected=138 measured=138
+cycles: T5_TwoOutputTiles pe.s1.loaded expected=92 measured=92
+cycles: T5_TwoOutputTiles pe.t0.done expected=138 measured=138
+cycles: T5_TwoOutputTiles pe.t0.store_done expected=158 measured=158
+cycles: T5_TwoOutputTiles pe.t1.done expected=224 measured=224
+cycles: T5b_OneOutputBuffer pe.done expected=264 measured=264
+cycles: T5b_OneOutputBuffer pe.s1.feed expected=158 measured=158
+cycles: T5b_OneOutputBuffer pe.t0.store_done expected=158 measured=158
+cycles: T5b_OneOutputBuffer pe.t1.done expected=244 measured=244
+cycles: T6_DmaStreamsAcrossDescriptors dma0.d0.done expected=20 measured=20
+cycles: T6_DmaStreamsAcrossDescriptors dma0.d1.done expected=28 measured=28
+cycles: T7_ExactCapacityStillRuns pe.done expected=158 measured=158
+cycles: V1_Fp16 t_end expected=84 measured=84
+cycles: V1_Fp32 t_end expected=88 measured=88
+cycles: V1_Int8Fixed t_end expected=82 measured=82
+cycles: V2_TwoSegments t_end expected=84 measured=84
+### Mismatches
+none
+### Summary
+100% tests passed, 0 tests failed out of 113
+determinism    =   0.06 sec*proc (2 tests)
+functional     =   1.25 sec*proc (4 tests)
+sim            =   0.20 sec*proc (33 tests)
+unit           =   0.19 sec*proc (74 tests)
+determinism: M=16;N=96;K=256;R=4;C=16;Kt=64;px=2;py=3;sram_x=1;sram_y=1;seed=3 identical over 2 runs
+determinism: t2 identical over 2 runs
+ctest quick functional: target=pe seed=20261014 cases=20 all_three_agree=20 model_wrong=0 cpp_ref_wrong=0 extreme_cases=1
+ctest quick functional: target=accel seed=20261014 cases=20 all_three_agree=20 model_wrong=0 cpp_ref_wrong=0 extreme_cases=4
+ctest quick functional: target=accel seed=20261014 cases=20 all_three_agree=20 model_wrong=0 cpp_ref_wrong=0 extreme_cases=2
+ctest quick attention functional: seed=20261014 cases=10 all_three_agree=10 model_wrong=0 cpp_ref_wrong=0
+failed tests: none
+
+## GEMM functional match by precision, 200 cases (release build)
+command: python3 python/gemm_check.py --target accel --prec all --apm-accel build/release/apm_accel --gemm-ref build/release/gemm_ref --cases 200 --csv results/phase4/functional_gemm.csv
+exit status: 0
+functional: prec=int8 cases=50 all_three_agree=50
+functional: prec=fp16 cases=50 all_three_agree=50
+functional: prec=bf16 cases=50 all_three_agree=50
+functional: prec=fp32 cases=50 all_three_agree=50
+functional: target=accel seed=20261014 cases=200 all_three_agree=200 model_wrong=0 cpp_ref_wrong=0 extreme_cases=25
+mismatching cases:
+  none
+
+## Attention functional match, 80 programs (release build)
+command: python3 python/attn_check.py --tools build/release --cases 80 --csv results/phase4/functional_attn.csv
+exit status: 0
+attention functional: seed=20261014 cases=80 all_three_agree=80 model_wrong=0 cpp_ref_wrong=0
+per combination: prefill/fp32/fixed=8/8, prefill/fp16/fixed=8/8, prefill/bf16/fixed=8/8, prefill/int8/row=8/8, prefill/int8/fixed=8/8, decode/fp32/fixed=8/8, decode/fp16/fixed=8/8, decode/bf16/fixed=8/8, decode/int8/row=8/8, decode/int8/fixed=8/8
+mismatching cases:
+  none
+
+## Study: 54 attention programs on the A4 configuration (release build)
+command: python3 python/study_p4.py --tools build/release --out-dir results/phase4
+exit status: 0
+study: programs=54 ops=162 failures=0 bit_exact=54 wall_s=48
+per program (cycles qk / softmax / pv = T_program; lower bound; error):
+  id=0 prefill prefill L=128 int8/row V=64 qk=4369 softmax=4848 pv=2426 T_program=11643 bound=5888.0 rel_fro_err=1.5317e-02 max_abs_err=2.7747e-02
+      DRAM per op (row_misses / accesses, bus_util): qk=574/2048,0.4688 softmax=197/1288,0.2657 pv=192/1536,0.6331
+  id=1 prefill prefill L=128 fp16 V=64 qk=5292 softmax=4699 pv=3723 T_program=13714 bound=7936.0 rel_fro_err=3.9065e-04 max_abs_err=1.0225e-03
+      DRAM per op (row_misses / accesses, bus_util): qk=640/3072,0.5805 softmax=184/1536,0.3269 pv=256/2560,0.6876
+  id=2 prefill prefill L=128 bf16 V=64 qk=5292 softmax=4699 pv=3723 T_program=13714 bound=7936.0 rel_fro_err=3.0459e-03 max_abs_err=1.0548e-02
+      DRAM per op (row_misses / accesses, bus_util): qk=640/3072,0.5805 softmax=184/1536,0.3269 pv=256/2560,0.6876
+  id=3 prefill prefill L=128 fp32 V=64 qk=7542 softmax=6894 pv=5929 T_program=20365 bound=12032.0 rel_fro_err=2.0773e-07 max_abs_err=4.6720e-07
+      DRAM per op (row_misses / accesses, bus_util): qk=768/5120,0.6789 softmax=352/2048,0.2971 pv=384/4608,0.7772
+  id=4 prefill prefill L=256 int8/row V=64 qk=27500 softmax=12137 pv=10039 T_program=49676 bound=19456.0 rel_fro_err=1.7469e-02 max_abs_err=2.6109e-02
+      DRAM per op (row_misses / accesses, bus_util): qk=4350/8192,0.2979 softmax=560/5136,0.4232 pv=512/5120,0.5100
+  id=5 prefill prefill L=256 fp16 V=64 qk=31037 softmax=15578 pv=12520 T_program=59135 bound=27648.0 rel_fro_err=3.8114e-04 max_abs_err=8.2208e-04
+      DRAM per op (row_misses / accesses, bus_util): qk=4608/12288,0.3959 softmax=1280/6144,0.3944 pv=768/9216,0.7361
+  id=6 prefill prefill L=256 bf16 V=64 qk=31037 softmax=15578 pv=12520 T_program=59135 bound=27648.0 rel_fro_err=2.9679e-03 max_abs_err=8.1045e-03
+      DRAM per op (row_misses / accesses, bus_util): qk=4608/12288,0.3959 softmax=1280/6144,0.3944 pv=768/9216,0.7361
+  id=7 prefill prefill L=256 fp32 V=64 qk=39619 softmax=24998 pv=20924 T_program=85541 bound=46080.0 rel_fro_err=2.4615e-07 max_abs_err=7.1034e-07
+      DRAM per op (row_misses / accesses, bus_util): qk=5120/20480,0.5169 softmax=1342/8192,0.3277 pv=1280/17408,0.8320
+  id=8 prefill prefill L=512 int8/row V=64 qk=188483 softmax=47196 pv=34823 T_program=270502 bound=71712.0 rel_fro_err=1.9668e-02 max_abs_err=3.1821e-02
+      DRAM per op (row_misses / accesses, bus_util): qk=17334/32768,0.1739 softmax=5122/20512,0.4346 pv=1536/18432,0.5293
+  id=9 prefill prefill L=512 fp16 V=64 qk=198395 softmax=70290 pv=46063 T_program=314748 bound=108544.0 rel_fro_err=3.9339e-04 max_abs_err=1.1025e-03
+      DRAM per op (row_misses / accesses, bus_util): qk=18432/49152,0.2477 softmax=5120/24576,0.3496 pv=2560/34816,0.7558
+  id=10 prefill prefill L=512 bf16 V=64 qk=198395 softmax=70290 pv=46063 T_program=314748 bound=108544.0 rel_fro_err=2.9485e-03 max_abs_err=5.8468e-03
+      DRAM per op (row_misses / accesses, bus_util): qk=18432/49152,0.2477 softmax=5120/24576,0.3496 pv=2560/34816,0.7558
+  id=11 prefill prefill L=512 fp32 V=64 qk=233080 softmax=114511 pv=80203 T_program=427794 bound=182272.0 rel_fro_err=2.8190e-07 max_abs_err=6.2823e-07
+      DRAM per op (row_misses / accesses, bus_util): qk=20480/81920,0.3515 softmax=5122/32768,0.2862 pv=4608/67584,0.8427
+  id=12 prefill prefill L=1024 int8/row V=64 qk=1402154 softmax=169564 pv=129127 T_program=1700845 bound=282688.0 rel_fro_err=2.1742e-02 max_abs_err=3.4162e-02
+      DRAM per op (row_misses / accesses, bus_util): qk=68928/131072,0.0935 softmax=20484/81984,0.4835 pv=5120/69632,0.5393
+  id=13 prefill prefill L=1024 fp16 V=64 qk=1425675 softmax=262174 pv=177071 T_program=1864920 bound=430080.0 rel_fro_err=4.2694e-04 max_abs_err=1.6495e-03
+      DRAM per op (row_misses / accesses, bus_util): qk=73760/196608,0.1379 softmax=20480/98304,0.3750 pv=9216/135168,0.7634
+  id=14 prefill prefill L=1024 bf16 V=64 qk=1425675 softmax=262174 pv=177071 T_program=1864920 bound=430080.0 rel_fro_err=3.2883e-03 max_abs_err=1.0360e-02
+      DRAM per op (row_misses / accesses, bus_util): qk=73760/196608,0.1379 softmax=20480/98304,0.3750 pv=9216/135168,0.7634
+  id=15 prefill prefill L=1024 fp32 V=64 qk=1564715 softmax=460335 pv=315494 T_program=2340544 bound=724992.0 rel_fro_err=3.3687e-07 max_abs_err=4.7742e-07
+      DRAM per op (row_misses / accesses, bus_util): qk=81951/327680,0.2094 softmax=20480/131072,0.2847 pv=17408/266240,0.8439
+  id=16 decode decode T=512 g=1 map=1x4 int8/row V=64 qk=1158 softmax=176 pv=1401 T_program=2735 bound=1564.2 rel_fro_err=2.4579e-02 max_abs_err=4.7654e-03
+      DRAM per op (row_misses / accesses, bus_util): qk=47/672,0.5803 softmax=11/41,0.2330 pv=41/644,0.4597
+  id=17 decode decode T=512 g=1 map=1x4 fp16 V=64 qk=1920 softmax=202 pv=1813 T_program=3935 bound=2724.0 rel_fro_err=3.6729e-04 max_abs_err=7.9476e-05
+      DRAM per op (row_misses / accesses, bus_util): qk=87/1312,0.6833 softmax=10/48,0.2376 pv=81/1284,0.7082
+  id=18 decode decode T=512 g=1 map=1x4 bf16 V=64 qk=1920 softmax=202 pv=1813 T_program=3935 bound=2724.0 rel_fro_err=3.0205e-03 max_abs_err=6.1371e-04
+      DRAM per op (row_misses / accesses, bus_util): qk=87/1312,0.6833 softmax=10/48,0.2376 pv=81/1284,0.7082
+  id=19 decode decode T=512 g=1 map=1x4 fp32 V=64 qk=3659 softmax=304 pv=3334 T_program=7297 bound=5220.0 rel_fro_err=5.0909e-07 max_abs_err=1.3632e-07
+      DRAM per op (row_misses / accesses, bus_util): qk=175/2592,0.7084 softmax=10/64,0.2105 pv=161/2564,0.7690
+  id=20 decode decode T=1024 g=1 map=1x4 int8/row V=64 qk=2183 softmax=275 pv=2529 T_program=4987 bound=3124.2 rel_fro_err=3.0267e-02 max_abs_err=3.5106e-03
+      DRAM per op (row_misses / accesses, bus_util): qk=100/1344,0.6157 softmax=21/81,0.2945 pv=81/1284,0.5077
+  id=21 decode decode T=1024 g=1 map=1x4 fp16 V=64 qk=3775 softmax=347 pv=3235 T_program=7357 bound=5444.0 rel_fro_err=3.7778e-04 max_abs_err=4.6845e-05
+      DRAM per op (row_misses / accesses, bus_util): qk=189/2624,0.6951 softmax=20/96,0.2767 pv=161/2564,0.7926
+  id=22 decode decode T=1024 g=1 map=1x4 bf16 V=64 qk=3775 softmax=347 pv=3235 T_program=7357 bound=5444.0 rel_fro_err=3.3177e-03 max_abs_err=3.6604e-04
+      DRAM per op (row_misses / accesses, bus_util): qk=189/2624,0.6951 softmax=20/96,0.2767 pv=161/2564,0.7926
+  id=23 decode decode T=1024 g=1 map=1x4 fp32 V=64 qk=6599 softmax=553 pv=6017 T_program=13169 bound=10436.0 rel_fro_err=5.0346e-07 max_abs_err=5.8317e-08
+      DRAM per op (row_misses / accesses, bus_util): qk=345/5184,0.7856 softmax=20/128,0.2315 pv=321/5124,0.8516
+  id=24 decode decode T=2048 g=1 map=1x4 int8/row V=64 qk=4317 softmax=473 pv=4785 T_program=9575 bound=6244.2 rel_fro_err=1.8870e-02 max_abs_err=2.2963e-03
+      DRAM per op (row_misses / accesses, bus_util): qk=210/2688,0.6227 softmax=41/161,0.3404 pv=161/2564,0.5358
+  id=25 decode decode T=2048 g=1 map=1x4 fp16 V=64 qk=7211 softmax=637 pv=6079 T_program=13927 bound=10884.0 rel_fro_err=3.1988e-04 max_abs_err=3.0685e-05
+      DRAM per op (row_misses / accesses, bus_util): qk=379/5248,0.7278 softmax=40/192,0.3014 pv=321/5124,0.8429
+  id=26 decode decode T=2048 g=1 map=1x4 bf16 V=64 qk=7211 softmax=637 pv=6079 T_program=13927 bound=10884.0 rel_fro_err=2.6983e-03 max_abs_err=2.2116e-04
+      DRAM per op (row_misses / accesses, bus_util): qk=379/5248,0.7278 softmax=40/192,0.3014 pv=321/5124,0.8429
+  id=27 decode decode T=2048 g=1 map=1x4 fp32 V=64 qk=12704 softmax=1051 pv=11385 T_program=25140 bound=20868.0 rel_fro_err=9.1345e-07 max_abs_err=1.4299e-07
+      DRAM per op (row_misses / accesses, bus_util): qk=695/10368,0.8161 softmax=40/256,0.2436 pv=641/10244,0.8998
+  id=28 decode decode T=4096 g=1 map=1x4 int8/row V=64 qk=8516 softmax=869 pv=9297 T_program=18682 bound=12484.2 rel_fro_err=2.3847e-02 max_abs_err=1.4317e-03
+      DRAM per op (row_misses / accesses, bus_util): qk=425/5376,0.6313 softmax=81/321,0.3694 pv=321/5124,0.5511
+  id=29 decode decode T=4096 g=1 map=1x4 fp16 V=64 qk=14064 softmax=1217 pv=11767 T_program=27048 bound=21764.0 rel_fro_err=3.6233e-04 max_abs_err=2.4477e-05
+      DRAM per op (row_misses / accesses, bus_util): qk=759/10496,0.7463 softmax=80/384,0.3155 pv=641/10244,0.8706
+  id=30 decode decode T=4096 g=1 map=1x4 bf16 V=64 qk=14064 softmax=1217 pv=11767 T_program=27048 bound=21764.0 rel_fro_err=3.1660e-03 max_abs_err=1.5487e-04
+      DRAM per op (row_misses / accesses, bus_util): qk=759/10496,0.7463 softmax=80/384,0.3155 pv=641/10244,0.8706
+  id=31 decode decode T=4096 g=1 map=1x4 fp32 V=64 qk=24903 softmax=2047 pv=22126 T_program=49076 bound=41732.0 rel_fro_err=1.6189e-06 max_abs_err=1.7928e-07
+      DRAM per op (row_misses / accesses, bus_util): qk=1397/20736,0.8327 softmax=80/512,0.2501 pv=1281/20484,0.9258
+  id=32 decode decode T=8192 g=1 map=1x4 int8/row V=64 qk=17171 softmax=1661 pv=18321 T_program=37153 bound=24964.2 rel_fro_err=2.8772e-02 max_abs_err=1.0561e-03
+      DRAM per op (row_misses / accesses, bus_util): qk=868/10752,0.6262 softmax=161/641,0.3859 pv=641/10244,0.5591
+  id=33 decode decode T=8192 g=1 map=1x4 fp16 V=64 qk=27871 softmax=2377 pv=23143 T_program=53391 bound=43524.0 rel_fro_err=5.3203e-04 max_abs_err=2.0899e-05
+      DRAM per op (row_misses / accesses, bus_util): qk=1523/20992,0.7532 softmax=160/768,0.3231 pv=1281/20484,0.8851
+  id=34 decode decode T=8192 g=1 map=1x4 bf16 V=64 qk=27871 softmax=2377 pv=23143 T_program=53391 bound=43524.0 rel_fro_err=3.9888e-03 max_abs_err=1.6826e-04
+      DRAM per op (row_misses / accesses, bus_util): qk=1523/20992,0.7532 softmax=160/768,0.3231 pv=1281/20484,0.8851
+  id=35 decode decode T=8192 g=1 map=1x4 fp32 V=64 qk=49518 softmax=4039 pv=43601 T_program=97158 bound=83460.0 rel_fro_err=1.8681e-06 max_abs_err=8.8698e-08
+      DRAM per op (row_misses / accesses, bus_util): qk=2805/41472,0.8375 softmax=160/1024,0.2535 pv=2561/40964,0.9395
+  id=36 gqa decode T=4096 g=4 map=1x4 fp16 V=64 qk=30469 softmax=3944 pv=11770 T_program=46183 bound=23056.0 rel_fro_err=4.3756e-04 max_abs_err=3.2228e-05
+      DRAM per op (row_misses / accesses, bus_util): qk=1664/11264,0.3697 softmax=320/1536,0.3895 pv=641/10256,0.8714
+  id=37 gqa decode T=4096 g=4 map=1x4 int8/row V=64 qk=25955 softmax=2495 pv=9300 T_program=37750 bound=13456.2 rel_fro_err=3.5653e-02 max_abs_err=3.1661e-03
+      DRAM per op (row_misses / accesses, bus_util): qk=1350/6144,0.2367 softmax=321/1281,0.5134 pv=321/5136,0.5523
+  id=38 gqa decode T=4096 g=8 map=1x4 fp16 V=64 qk=50935 softmax=7872 pv=11774 T_program=70581 bound=25632.0 rel_fro_err=4.4011e-04 max_abs_err=3.9739e-05
+      DRAM per op (row_misses / accesses, bus_util): qk=2704/12288,0.2412 softmax=640/3072,0.3902 pv=642/10272,0.8724
+  id=39 gqa decode T=4096 g=8 map=1x4 int8/row V=64 qk=46291 softmax=4958 pv=9304 T_program=60553 bound=14880.5 rel_fro_err=3.8289e-02 max_abs_err=4.5253e-03
+      DRAM per op (row_misses / accesses, bus_util): qk=2374/7168,0.1548 softmax=641/2561,0.5165 pv=322/5152,0.5537
+  id=40 gqa decode T=4096 g=16 map=1x4 fp16 V=64 qk=91804 softmax=15722 pv=11782 T_program=119308 bound=30784.0 rel_fro_err=4.4923e-04 max_abs_err=4.4105e-05
+      DRAM per op (row_misses / accesses, bus_util): qk=4736/14336,0.1562 softmax=1280/6144,0.3908 pv=644/10304,0.8746
+  id=41 gqa decode T=4096 g=16 map=1x4 int8/row V=64 qk=86782 softmax=9863 pv=9312 T_program=105957 bound=19521.0 rel_fro_err=3.7430e-02 max_abs_err=4.4801e-03
+      DRAM per op (row_misses / accesses, bus_util): qk=4416/9216,0.1062 softmax=1281/5121,0.5192 pv=324/5184,0.5567
+  id=42 physical decode T=4096 g=1 map=2x2 int8/row V=64 qk=14251 softmax=869 pv=11041 T_program=26161 bound=22684.2 rel_fro_err=2.3847e-02 max_abs_err=1.4317e-03
+      DRAM per op (row_misses / accesses, bus_util): qk=426/6400,0.4491 softmax=81/321,0.3694 pv=386/6148,0.5568
+  id=43 physical decode T=4096 g=1 map=2x2 fp16 V=64 qk=22533 softmax=1217 pv=16741 T_program=40491 bound=39132.0 rel_fro_err=3.6233e-04 max_abs_err=2.4477e-05
+      DRAM per op (row_misses / accesses, bus_util): qk=908/12544,0.5567 softmax=80/384,0.3155 pv=770/12292,0.7342
+  id=44 physical decode T=4096 g=1 map=2x2 bf16 V=64 qk=22533 softmax=1217 pv=16741 T_program=40491 bound=39132.0 rel_fro_err=3.1660e-03 max_abs_err=1.5487e-04
+      DRAM per op (row_misses / accesses, bus_util): qk=908/12544,0.5567 softmax=80/384,0.3155 pv=770/12292,0.7342
+  id=45 physical decode T=4096 g=1 map=2x2 fp32 V=64 qk=39099 softmax=2047 pv=33303 T_program=74449 bound=72028.0 rel_fro_err=1.6189e-06 max_abs_err=1.7928e-07
+      DRAM per op (row_misses / accesses, bus_util): qk=1676/24832,0.6351 softmax=80/512,0.2501 pv=1539/24580,0.7381
+  id=46 vu_lanes prefill L=1024 fp16 V=16 qk=1425675 softmax=262347 pv=177071 T_program=1865093 bound=540672.0 rel_fro_err=4.2694e-04 max_abs_err=1.6495e-03
+      DRAM per op (row_misses / accesses, bus_util): qk=73760/196608,0.1379 softmax=20480/98304,0.3747 pv=9216/135168,0.7634
+  id=47 vu_lanes prefill L=1024 fp16 V=32 qk=1425675 softmax=262221 pv=177071 T_program=1864967 bound=442368.0 rel_fro_err=4.2694e-04 max_abs_err=1.6495e-03
+      DRAM per op (row_misses / accesses, bus_util): qk=73760/196608,0.1379 softmax=20480/98304,0.3749 pv=9216/135168,0.7634
+  id=48 vu_lanes prefill L=1024 fp16 V=128 qk=1425675 softmax=262160 pv=177071 T_program=1864906 bound=430080.0 rel_fro_err=4.2694e-04 max_abs_err=1.6495e-03
+      DRAM per op (row_misses / accesses, bus_util): qk=73760/196608,0.1379 softmax=20480/98304,0.3750 pv=9216/135168,0.7634
+  id=49 int8_fixed decode T=512 g=1 map=1x4 int8/fixed V=64 qk=1158 softmax=157 pv=1401 T_program=2716 bound=1564.0 rel_fro_err=5.7910e-01 max_abs_err=9.0236e-02
+      DRAM per op (row_misses / accesses, bus_util): qk=47/672,0.5803 softmax=10/40,0.2548 pv=41/644,0.4597
+  id=50 int8_fixed decode T=1024 g=1 map=1x4 int8/fixed V=64 qk=2183 softmax=256 pv=2529 T_program=4968 bound=3124.0 rel_fro_err=8.0715e-01 max_abs_err=8.9212e-02
+      DRAM per op (row_misses / accesses, bus_util): qk=100/1344,0.6157 softmax=20/80,0.3125 pv=81/1284,0.5077
+  id=51 int8_fixed decode T=2048 g=1 map=1x4 int8/fixed V=64 qk=4317 softmax=454 pv=4785 T_program=9556 bound=6244.0 rel_fro_err=9.5196e-01 max_abs_err=1.0308e-01
+      DRAM per op (row_misses / accesses, bus_util): qk=210/2688,0.6227 softmax=40/160,0.3524 pv=161/2564,0.5358
+  id=52 int8_fixed decode T=4096 g=1 map=1x4 int8/fixed V=64 qk=8516 softmax=850 pv=9297 T_program=18663 bound=12484.0 rel_fro_err=1.0000e+00 max_abs_err=5.7895e-02
+      DRAM per op (row_misses / accesses, bus_util): qk=425/5376,0.6313 softmax=80/320,0.3765 pv=321/5124,0.5511
+  id=53 int8_fixed decode T=8192 g=1 map=1x4 int8/fixed V=64 qk=17171 softmax=1642 pv=18321 T_program=37134 bound=24964.0 rel_fro_err=1.0000e+00 max_abs_err=4.4347e-02
+      DRAM per op (row_misses / accesses, bus_util): qk=868/10752,0.6262 softmax=160/640,0.3898 pv=641/10244,0.5591
+H2 prefill L=1024 time ratios:
+  measured fp16/int8=1.0965 fp32/fp16=1.2550 bf16/fp16=1.0000
+  bound    fp16/int8=1.5214 fp32/fp16=1.6857
+H3 softmax share of prefill time at L=1024:
+  int8: softmax=169564 T_program=1700845 share=0.0997
+  fp16: softmax=262174 T_program=1864920 share=0.1406
+  bf16: softmax=262174 T_program=1864920 share=0.1406
+  fp32: softmax=460335 T_program=2340544 share=0.1967
+H4 decode T=4096 g=1 qk op stall stacks (PE-cycles):
+  int8: qk=8516 bound=7040.0 predicted=dram largest=compute compute=28160 dram=737 sram_conflict=6 network=575 dma=4311 idle=275
+  fp16: qk=14064 bound=11136.0 predicted=dram largest=compute compute=44544 dram=784 sram_conflict=5 network=895 dma=9605 idle=423
+  bf16: qk=14064 bound=11136.0 predicted=dram largest=compute compute=44544 dram=784 sram_conflict=5 network=895 dma=9605 idle=423
+  fp32: qk=24903 bound=20736.0 predicted=dram largest=compute compute=77312 dram=1093 sram_conflict=2 network=1706 dma=18752 idle=747
+H5 GQA at T=4096: T(g)/T(1), per-query-head T(g)/(g*T(1)):
+  fp16 g=4: T=46183 ratio=1.7074 per_head=0.4269
+  fp16 g=8: T=70581 ratio=2.6095 per_head=0.3262
+  fp16 g=16: T=119308 ratio=4.4110 per_head=0.2757
+  int8 g=4: T=37750 ratio=2.0207 per_head=0.5052
+  int8 g=8: T=60553 ratio=3.2412 per_head=0.4052
+  int8 g=16: T=105957 ratio=5.6716 per_head=0.3545
+H6 physical 2x2 vs logical 1x4 mapping, decode T=4096 g=1, qk op:
+  int8: qk logical=8516 physical=14251 speedup=1.6734 program speedup=1.4003
+  fp16: qk logical=14064 physical=22533 speedup=1.6022 program speedup=1.4970
+  bf16: qk logical=14064 physical=22533 speedup=1.6022 program speedup=1.4970
+  fp32: qk logical=24903 physical=39099 speedup=1.5701 program speedup=1.5170
+H7 relative Frobenius error of O vs FP64:
+  prefill L=128 int8/row: 1.5317e-02
+  prefill L=128 fp16: 3.9065e-04
+  prefill L=128 bf16: 3.0459e-03
+  prefill L=128 fp32: 2.0773e-07
+  prefill L=256 int8/row: 1.7469e-02
+  prefill L=256 fp16: 3.8114e-04
+  prefill L=256 bf16: 2.9679e-03
+  prefill L=256 fp32: 2.4615e-07
+  prefill L=512 int8/row: 1.9668e-02
+  prefill L=512 fp16: 3.9339e-04
+  prefill L=512 bf16: 2.9485e-03
+  prefill L=512 fp32: 2.8190e-07
+  prefill L=1024 int8/row: 2.1742e-02
+  prefill L=1024 fp16: 4.2694e-04
+  prefill L=1024 bf16: 3.2883e-03
+  prefill L=1024 fp32: 3.3687e-07
+  decode T=512 int8/row: 2.4579e-02
+  decode T=512 fp16: 3.6729e-04
+  decode T=512 bf16: 3.0205e-03
+  decode T=512 fp32: 5.0909e-07
+  decode T=1024 int8/row: 3.0267e-02
+  decode T=1024 fp16: 3.7778e-04
+  decode T=1024 bf16: 3.3177e-03
+  decode T=1024 fp32: 5.0346e-07
+  decode T=2048 int8/row: 1.8870e-02
+  decode T=2048 fp16: 3.1988e-04
+  decode T=2048 bf16: 2.6983e-03
+  decode T=2048 fp32: 9.1345e-07
+  decode T=4096 int8/row: 2.3847e-02
+  decode T=4096 fp16: 3.6233e-04
+  decode T=4096 bf16: 3.1660e-03
+  decode T=4096 fp32: 1.6189e-06
+  decode T=8192 int8/row: 2.8772e-02
+  decode T=8192 fp16: 5.3203e-04
+  decode T=8192 bf16: 3.9888e-03
+  decode T=8192 fp32: 1.8681e-06
+  decode T=512 int8/fixed: 5.7910e-01
+  decode T=1024 int8/fixed: 8.0715e-01
+  decode T=2048 int8/fixed: 9.5196e-01
+  decode T=4096 int8/fixed: 1.0000e+00
+  decode T=8192 int8/fixed: 1.0000e+00
+  bf16/fp16 error ratio prefill L=128: 7.7970
+  bf16/fp16 error ratio prefill L=256: 7.7869
+  bf16/fp16 error ratio prefill L=512: 7.4951
+  bf16/fp16 error ratio prefill L=1024: 7.7020
+  bf16/fp16 error ratio decode T=512: 8.2237
+  bf16/fp16 error ratio decode T=1024: 8.7821
+  bf16/fp16 error ratio decode T=2048: 8.4354
+  bf16/fp16 error ratio decode T=4096: 8.7379
+  bf16/fp16 error ratio decode T=8192: 7.4973
+  int8 decode T=512: fixed=5.7910e-01 row=2.4579e-02 fixed/row=23.5608
+  int8 decode T=1024: fixed=8.0715e-01 row=3.0267e-02 fixed/row=26.6677
+  int8 decode T=2048: fixed=9.5196e-01 row=1.8870e-02 fixed/row=50.4483
+  int8 decode T=4096: fixed=1.0000e+00 row=2.3847e-02 fixed/row=41.9340
+  int8 decode T=8192: fixed=1.0000e+00 row=2.8772e-02 fixed/row=34.7560
+H8 VU busy fraction, prefill L=1024 fp16:
+  V=16: softmax=262347 busy=208896 busy_frac=0.7963
+  V=32: softmax=262221 busy=110592 busy_frac=0.4218
+  V=64: softmax=262174 busy=61440 busy_frac=0.2343
+  V=128: softmax=262160 busy=36864 busy_frac=0.1406

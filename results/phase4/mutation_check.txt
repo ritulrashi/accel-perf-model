@@ -1,0 +1,142 @@
+# Phase 4 mutation check: do the tests, stall-stack assertions and functional checks detect injected bugs?
+command: scripts/phase4_mutation_check.sh
+
+## Provenance (of the unmutated tree the mutants were derived from)
+date_utc: 2026-10-14T19:46:43Z
+commit: 84a082a6e02801c3d0dbca8da5f21938fe046bd0
+tree: clean
+host: Linux 6.8.0-1064-azure x86_64
+os: Ubuntu 24.04.3 LTS
+lscpu:
+  Architecture:                            x86_64
+  CPU(s):                                  2
+  Model name:                              AMD EPYC 7763 64-Core Processor
+  Thread(s) per core:                      2
+  Core(s) per socket:                      1
+  Socket(s):                               1
+  L1d cache:                               32 KiB (1 instance)
+  L1i cache:                               32 KiB (1 instance)
+  L2 cache:                                512 KiB (1 instance)
+  L3 cache:                                32 MiB (1 instance)
+mem_total: 8132888 kB
+tools:
+  c++: c++ (Ubuntu 13.3.0-6ubuntu2~24.04) 13.3.0
+  cmake: cmake version 3.28.3
+  ninja: 1.11.1
+  systemc: 3.0.2 (release date 20251031) at /opt/systemc-3.0.2, commit 70b0fc8e4a74acc677b0fc73cea08f940c2115d5
+  googletest: 52eb8108c5bdec04579160ae17225d66034bd723  # v1.17.0
+  python3: Python 3.12.3
+  numpy: 1.26.4
+  verilator: Verilator 5.020 2024-01-01 rev (Debian 5.020-1)
+
+## Baseline (unmutated copy)
+ctest: tests passed, 0 tests failed out of 113
+failing tests: none
+
+## M1 (src/pe/pe_config.h)
+29:  Cycle feed_cycles() const { return kt; }  // MUTANT M1 feed ignores q
+failing tests (4):
+  sim.Phase4.T1_Fp16
+  sim.Phase4.T2_Fp32
+  sim.Phase4.T3_Bf16TimingEqualsFp16
+  unit.PeConfig.P4Fp32CapacityBoundary
+required: sim.Phase4.T1_Fp16
+verdict: CAUGHT
+
+## M2 (src/pe/gemm_layout.h)
+53:  std::uint64_t b_block_bytes() const { return kt * array.cols; }  // MUTANT M2 staging ignores e
+failing tests (6):
+  functional.accel_prec20
+  functional.attn10
+  sim.Phase4.T1_Fp16
+  sim.Phase4.T2_Fp32
+  sim.Phase4.T3_Bf16TimingEqualsFp16
+  unit.SocPlan.PrecisionScalesBlocks
+required: sim.Phase4.T1_Fp16 functional.accel_prec20
+verdict: CAUGHT
+
+## M3 (src/compute/systolic.cpp)
+47:        const float prod = 0.0f; acc = std::fma(a[i * kt + k], b[k * a_.cols + j], acc);  // MUTANT M3 fused multiply-add
+failing tests (3):
+  functional.accel_prec20
+  functional.attn10
+  unit.Systolic.Fp32AccumulateIsNotFused
+  3-way summary: functional: target=accel seed=20261014 cases=20 all_three_agree=15 model_wrong=5 cpp_ref_wrong=0 extreme_cases=2
+  3-way summary: attention functional: seed=20261014 cases=10 all_three_agree=8 model_wrong=2 cpp_ref_wrong=0
+required: functional.accel_prec20 unit.Systolic.Fp32AccumulateIsNotFused
+verdict: CAUGHT
+
+## M4 (src/compute/numerics.cpp)
+77:  if (rem > 0xffffu) ++m16;  // MUTANT M4 FP16 truncates (rem <= 0x1fff: never rounds up)
+failing tests (2):
+  functional.attn10
+  unit.Numerics.Fp16RoundToNearestEvenHandCases
+  3-way summary: attention functional: seed=20261014 cases=10 all_three_agree=8 model_wrong=2 cpp_ref_wrong=0
+required: unit.Numerics.Fp16RoundToNearestEvenHandCases functional.attn10
+verdict: CAUGHT
+
+## M5 (src/compute/numerics.cpp)
+122:  for (std::uint64_t j = 0; j < n; ++j) lane[0] += e[j];  // MUTANT M5 sequential sum
+failing tests (2):
+  functional.attn10
+  unit.Numerics.LaneOrderSumHandCase
+  3-way summary: attention functional: seed=20261014 cases=10 all_three_agree=5 model_wrong=5 cpp_ref_wrong=0
+required: unit.Numerics.LaneOrderSumHandCase functional.attn10
+verdict: CAUGHT
+
+## M6 (src/vec/softmax.cpp)
+15:  auto valid = [&](std::uint64_t j) { (void)j; (void)row; return true; };  // MUTANT M6 mask ignored
+failing tests (2):
+  functional.attn10
+  unit.Softmax.CausalRowZeroIsOneHot
+  3-way summary: attention functional: seed=20261014 cases=10 all_three_agree=5 model_wrong=5 cpp_ref_wrong=0
+required: unit.Softmax.CausalRowZeroIsOneHot functional.attn10
+verdict: CAUGHT
+
+## M7 (src/vec/vu_plan.h)
+49:  return 2 * ((n + c.lanes - 1) / c.lanes + c.t_vu);  // MUTANT M7 two passes
+failing tests (5):
+  sim.Phase4.V1_Fp16
+  sim.Phase4.V1_Fp32
+  sim.Phase4.V1_Int8Fixed
+  sim.Phase4.V2_TwoSegments
+  unit.VuPlan.RowCycles
+required: sim.Phase4.V1_Fp16 unit.VuPlan.RowCycles
+verdict: CAUGHT
+
+## M8 (src/vec/vu_plan.cpp)
+48:  (void)mi; (void)i; const std::uint64_t dst = j.p_base + row * j.n * j.elem(), stride = seg;  // MUTANT M8 P row-major
+failing tests (3):
+  functional.attn10
+  sim.Phase4.V2_TwoSegments
+  unit.VuPlan.PackedStoreDescriptors
+  3-way summary: attention functional: seed=20261014 cases=10 all_three_agree=0 model_wrong=10 cpp_ref_wrong=0
+required: sim.Phase4.V2_TwoSegments unit.VuPlan.PackedStoreDescriptors functional.attn10
+verdict: CAUGHT
+
+## M9 (src/soc/soc_plan.cpp)
+102:          l_.array.rows, row, row, 4 * l_.shape.n};  // MUTANT M9 write-back ignores m_valid
+failing tests (3):
+  functional.attn10
+  sim.Phase4.T4_MaskedWriteBack
+  unit.SocPlan.MaskedWriteBack
+required: sim.Phase4.T4_MaskedWriteBack unit.SocPlan.MaskedWriteBack
+verdict: CAUGHT
+
+## M10 (src/soc/soc_plan.cpp)
+17:  const unsigned mx = cfg.px, my = cfg.py;  // MUTANT M10 logical mapping ignored
+failing tests (1):
+  unit.SocPlan.LogicalMapping1x4
+required: unit.SocPlan.LogicalMapping1x4
+verdict: CAUGHT
+
+## M11 (tools/attn_ref.cpp)
+153:    auto ok = [&](std::uint64_t j) { return !causal || j < i + q_off; };  // MUTANT M11 reference mask off by one
+failing tests (1):
+  functional.attn10
+  3-way summary: attention functional: seed=20261014 cases=10 all_three_agree=5 model_wrong=0 cpp_ref_wrong=5
+required: functional.attn10
+verdict: CAUGHT
+
+## Result
+all mutants caught by their required tests: yes

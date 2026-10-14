@@ -1,6 +1,6 @@
 # Phase 4 Design Note — Attention Workloads, Vector Unit, Precision Modes
 
-Status: **approved 2026-10-14 (user: "go"); implementing**
+Status: **approved 2026-10-14 (user: "go"); implemented**
 
 ## 0. What Phase 4 adds
 

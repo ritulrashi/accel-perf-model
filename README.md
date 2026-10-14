@@ -17,11 +17,11 @@ configurable modelling parameter, not a datasheet value. See
 | 1 | Memory system: DRAM channel, banked SRAM, DMA | [docs/phase1-design.md](docs/phase1-design.md) | done: [exit criterion](results/phase1/exit_criterion.txt), [mutation check](results/phase1/mutation_check.txt) |
 | 2 | Compute unit, double buffering, functional reference | [docs/phase2-design.md](docs/phase2-design.md) | done: [exit criterion](results/phase2/exit_criterion.txt), [functional cases](results/phase2/functional.csv), [mutation check](results/phase2/mutation_check.txt) |
 | 3 | Accelerator top, stall stack, roofline | [docs/phase3-design.md](docs/phase3-design.md) | done: [exit criterion](results/phase3/exit_criterion.txt), [sweep](results/phase3/sweep.csv), [roofline](results/phase3/roofline.png), [mutation check](results/phase3/mutation_check.txt), [hypotheses](RESULTS.md) |
-| 4 | Attention / GenAI workloads, precision modes | — | not started |
+| 4 | Attention / GenAI workloads, precision modes, vector unit | [docs/phase4-design.md](docs/phase4-design.md) | done: [exit criterion](results/phase4/exit_criterion.txt), [study](results/phase4/study.csv), [GEMM](results/phase4/functional_gemm.csv) and [attention](results/phase4/functional_attn.csv) functional cases, [mutation check](results/phase4/mutation_check.txt), [hypotheses](RESULTS.md) |
 | 5 | Microarchitecture sweeps, SystemVerilog correlation | — | not started |
 | 6 | Automation and CI | — | not started |
 
-## Architecture (through Phase 3)
+## Architecture (through Phase 4)
 
 ```
                  ┌──────────────────────── PE ───────────────────────────┐
@@ -54,6 +54,19 @@ configurable modelling parameter, not a datasheet value. See
     DRAM bytes match the staging formula.
   - **Roofline:** a three-ceiling roofline (compute, DRAM, NoC) computed
     from formulas only. See [docs/phase3-design.md](docs/phase3-design.md).
+- **Precision modes, vector unit, attention (Phase 4):**
+  - **Precision modes:** INT8, FP16, BF16 and FP32. An e-byte mode takes
+    e cycles per reduction step and moves e-byte operands.
+  - **Bit-exact numerics:** the floating-point arithmetic follows a
+    written spec (ascending-k FP32 accumulation without FMA, round-to-
+    nearest-even conversions, a specified polynomial exp). The model matches
+    a NumPy replica and a standalone C++ reference bit for bit.
+  - **Vector unit:** a row softmax unit with its own DMA, local memory and
+    stall stack.
+  - **Front end:** `python/attn.py` lowers prefill (causal) and decode
+    (grouped-query, KV cache) attention into a Q·Kᵀ → softmax → P·V program.
+    Each op runs on the model as its own simulation, with the DRAM image
+    handed along. See [docs/phase4-design.md](docs/phase4-design.md).
 
 ```
  DRAM ─ global DMA ─ shared SRAM @ router sram_node ─┬─ mesh ─ PE(0,0) … PE(Px-1,Py-1)
@@ -79,6 +92,11 @@ python3 python/gemm_check.py --apm-gemm build/release/apm_gemm --gemm-ref build/
 build/release/apm_accel M=16 N=96 K=256 R=4 C=16 Kt=64 px=2 py=3 sram_x=1 sram_y=1 seed=3
 python3 python/roofline.py                                       # formula-only ceilings, design note §4.1
 python3 python/sweep_p3.py --apm-accel build/release/apm_accel --out-dir /tmp/sweep
+# Phase 4: one FP16 GEMM on the grid; one attention program with the three-way bit-exact check and FP64 error
+build/release/apm_accel M=16 N=64 K=128 R=4 C=16 Kt=64 px=2 py=2 prec=fp16 seed=3
+python3 python/attn.py --mode decode --T 4096 --g 8 --prec int8 --p-scale row --tools build/release --check
+python3 python/attn_check.py --tools build/release --cases 80          # random programs, model vs NumPy vs attn_ref
+python3 python/study_p4.py --tools build/release --out-dir /tmp/study  # the 54-program study
 ```
 
 ## Reproducing results
@@ -94,6 +112,9 @@ python3 python/sweep_p3.py --apm-accel build/release/apm_accel --out-dir /tmp/sw
 | All Phase 3 results, each on a clean tree | `scripts/phase3_results.sh` | the files below |
 | Phase 3 exit criterion: hand-derived stall stacks, 100-case grid functional match, 115-config sweep | `scripts/phase3_exit.sh` | `results/phase3/exit_criterion.txt`, `functional_accel.csv`, `sweep.csv`, `roofline.png`, `stall_stacks.png` |
 | Phase 3 mutation check | `scripts/phase3_mutation_check.sh` | `results/phase3/mutation_check.txt` |
+| All Phase 4 results, each on a clean tree | `scripts/phase4_results.sh` | the files below |
+| Phase 4 exit criterion: hand-derived precision and VU tests, 200 GEMMs by precision, 80 attention programs, 54-program study | `scripts/phase4_exit.sh` | `results/phase4/exit_criterion.txt`, `functional_gemm.csv`, `functional_attn.csv`, `study.csv`, `attention_breakdown.png`, `numerics.png`, `attention_roofline.png` |
+| Phase 4 mutation check | `scripts/phase4_mutation_check.sh` | `results/phase4/mutation_check.txt` |
 | Every number in RESULTS.md | `scripts/check_results.sh` | pass/fail |
 
 Every results file starts with a provenance block (`scripts/env_report.sh`):
@@ -104,6 +125,7 @@ commit, clean/dirty tree, machine, and tool versions.
 - [docs/phase1-design.md](docs/phase1-design.md): Phase 1 design note
 - [docs/phase2-design.md](docs/phase2-design.md): Phase 2 design note
 - [docs/phase3-design.md](docs/phase3-design.md): Phase 3 design note
+- [docs/phase4-design.md](docs/phase4-design.md): Phase 4 design note
 - [RESULTS.md](RESULTS.md): measured results and hypothesis verdicts
 - [docs/BUGS.md](docs/BUGS.md): every bug found, and how it was detected
 - [docs/LIMITATIONS.md](docs/LIMITATIONS.md): what is not modelled
