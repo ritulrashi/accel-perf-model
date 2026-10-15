@@ -199,9 +199,10 @@ What this project does **not** model or verify. Updated every phase.
   RESULTS.md.
 - **The push job builds ASan without the RTL** (to stay near 5 minutes).
   The RTL is covered by the release build on every push, and under ASan only
-  by the nightly job.
-- **Mutation checks run nightly, not on push.** A change that makes a
-  mutant undetectable is noticed within a day, not at the push itself.
+  by the on-demand `full` job.
+- **Mutation checks run only on demand** (the `full` job; it was nightly
+  until 2026-10-15). A change that makes a mutant undetectable is noticed
+  only when someone runs that job.
 - **Runtimes are single measurements** on shared cloud machines (GitHub
   runners, a Codespace with 2 SMT threads on one core). They vary run to run
   and are reported as measured, not averaged.

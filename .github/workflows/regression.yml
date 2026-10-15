@@ -1,5 +1,6 @@
 # Regression on every push and pull request; everything under ASan plus all
-# mutation checks nightly and on demand (docs/phase6-design.md §3). The
+# mutation checks on demand (docs/phase6-design.md §3; the nightly schedule
+# was switched off on 2026-10-15 at the owner's request). The
 # toolchain comes from the same .devcontainer/setup.sh as the Codespace, so
 # CI and development use identical versions; the logs print them.
 name: regression
@@ -7,8 +8,6 @@ name: regression
 on:
   push:
   pull_request:
-  schedule:
-    - cron: "23 5 * * *"   # nightly full run
   workflow_dispatch:
 
 jobs:
@@ -45,7 +44,7 @@ jobs:
           if-no-files-found: ignore
 
   full:
-    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-24.04
     timeout-minutes: 240
     steps:

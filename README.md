@@ -48,7 +48,7 @@ against the generated results files.
 - **Phase 6:**
   - All 8 published results CSVs reproduce byte for byte at HEAD, in CI,
     on every push.
-  - The nightly job caught older mutation checks rotting as the code
+  - The `full` CI job caught older mutation checks rotting as the code
     evolved.
 
 ## Architecture (through Phase 5)
@@ -154,8 +154,10 @@ configure with `-DAPM_RTL=OFF` to skip it.
 - regenerates every committed results CSV and byte-compares it
   (`python/reproduce.py`).
 
-CI runs it on every push. `.github/workflows/regression.yml` also runs a
-nightly job with ASan on the RTL plus all mutation checks. All sweep and
+CI runs it on every push. `.github/workflows/regression.yml` also has a
+`full` job: ASan on the RTL plus all mutation checks. It runs on demand
+(`gh workflow run regression.yml`, or "Run workflow" on the Actions tab).
+It is not scheduled. All sweep and
 check scripts take `--jobs N` (default: all CPUs), and their output is
 identical for every N.
 
