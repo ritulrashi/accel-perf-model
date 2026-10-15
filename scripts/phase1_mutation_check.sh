@@ -34,7 +34,7 @@ mutants=(
   "M3|src/mem/dram_timing.cpp|s#s.data_start = std::max(s.col_issue + p_.t_hit, bus_free_);#s.data_start = s.col_issue + p_.t_hit;  // MUTANT M3 bus not shared#|sim.Phase1.T2_TwoDmasShareOneChannel sim.Phase1.T4d_OtherBankBackToBack"
   "M4|src/mem/dram_channel.cpp|s#if (in_queue_.size() >= timing_.params().queue_depth) return false;#if (false) return false;  // MUTANT M4 queue never refuses#|sim.Phase1.T2b_QueueBackpressure"
   "M5|src/common/rr_arbiter.h|s#p_ = (port + 1) % n_;#p_ = 0 * port;  // MUTANT M5 fixed priority, port 0 first#|sim.Phase1.T2_TwoDmasShareOneChannel"
-  "M6|src/dma/dma_engine.cpp|s#^    ++buffers_free_;\$#    // MUTANT M6 (buffer freed at read response instead)#; s#write_q_.push_back(it->second);#write_q_.push_back(it->second); ++buffers_free_;  // MUTANT M6#|sim.Phase1.T1b_OneBufferIsLatencyBound"
+  "M6|src/dma/dma_engine.cpp|s#^    ++buffers_free_;\$#    // MUTANT M6 (buffer freed at read response instead)#; s#^    write_q_.push_back(b);\$#    write_q_.push_back(b); ++buffers_free_;  // MUTANT M6#|sim.Phase1.T1b_OneBufferIsLatencyBound"
   "M7|src/mem/dram_timing.cpp|s#s.start = std::max(accept, bank_ready_\[a.bank\]);#s.start = accept;  // MUTANT M7 no bank occupancy#|sim.Phase1.T4c_SameBankBackToBack"
   "M8|src/mem/sampled_target.cpp|/else if (trans.is_write())/{n;s#std::memcpy(store_.data() + addr, trans.get_data_ptr(), len);#(void)0;  // MUTANT M8 writes not stored#}|sim.Phase1.T1_SingleTransfer sim.Phase1.T1c_ReverseDirection sim.Phase1.F2D_DramToSramStrided sim.Phase1.F2D_SramToDramStrided"
 )
