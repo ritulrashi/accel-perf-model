@@ -19,7 +19,37 @@ configurable modelling parameter, not a datasheet value. See
 | 3 | Accelerator top, stall stack, roofline | [docs/phase3-design.md](docs/phase3-design.md) | done: [exit criterion](results/phase3/exit_criterion.txt), [sweep](results/phase3/sweep.csv), [roofline](results/phase3/roofline.png), [mutation check](results/phase3/mutation_check.txt), [hypotheses](RESULTS.md) |
 | 4 | Attention / GenAI workloads, precision modes, vector unit | [docs/phase4-design.md](docs/phase4-design.md) | done: [exit criterion](results/phase4/exit_criterion.txt), [study](results/phase4/study.csv), [GEMM](results/phase4/functional_gemm.csv) and [attention](results/phase4/functional_attn.csv) functional cases, [mutation check](results/phase4/mutation_check.txt), [hypotheses](RESULTS.md) |
 | 5 | SystemVerilog correlation of the compute array, DRAM bank map, microarchitecture sweeps | [docs/phase5-design.md](docs/phase5-design.md) | done: [exit criterion](results/phase5/exit_criterion.txt), [correlation](results/phase5/correlation.csv) and [log](docs/CORRELATION.md), [sweeps](results/phase5/sweep.csv), [mutation check](results/phase5/mutation_check.txt), [hypotheses](RESULTS.md) |
-| 6 | Automation and CI | — | not started |
+| 6 | Parallel runner, reproduction of every results CSV, CI | [docs/phase6-design.md](docs/phase6-design.md) | done: [exit criterion](results/phase6/exit_criterion.txt), [CI runtime](results/phase6/ci_runtime.txt), [Codespace runtime](results/phase6/regression_runtime.txt), [runner speedup](results/phase6/runner_speedup.txt), [mutation check](results/phase6/mutation_check.txt), [hypotheses](RESULTS.md) |
+
+## What the project found
+
+Every number below is from [RESULTS.md](RESULTS.md), which is checked
+against the generated results files.
+
+- **Phase 3:** a roofline predicts which ceiling is lowest, but often not
+  what the PEs actually wait on. Many "DRAM-bound" configurations spend
+  their time in on-chip fetch latency or synchronization instead. H2 was
+  partly refuted.
+- **Phase 4:**
+  - **Unfused attention on this model is limited by DRAM row misses on the
+    S write-back.** Precision barely matters: FP16 is only 1.0965× slower
+    than INT8 in prefill at L = 1024.
+  - Decode Q·Kᵀ is array-bound, not memory-bound, because of padding and
+    per-tile fill/drain.
+  - INT8 softmax with a fixed scale outputs all zeros at long context;
+    per-row scaling costs nothing and fixes it.
+- **Phase 5:**
+  - The SystemVerilog array matches the model on every cycle of 312
+    schedules (26336028 MACs).
+  - An XOR bank map makes INT8 prefill 2.2393× faster, but cannot fix
+    strides of B² DRAM rows (grouped-query decode).
+  - Of three equal-MAC arrangements, the single 32×32 array wins prefill:
+    its wider S rows halve the row misses.
+- **Phase 6:**
+  - All 8 published results CSVs reproduce byte for byte at HEAD, in CI,
+    on every push.
+  - The nightly job caught older mutation checks rotting as the code
+    evolved.
 
 ## Architecture (through Phase 5)
 
@@ -118,6 +148,19 @@ configure with `-DAPM_RTL=OFF` to skip it.
 
 ## Reproducing results
 
+**Everything at once:** `scripts/phase6_regression.sh`
+- builds both presets and runs every test;
+- checks every number in RESULTS.md;
+- regenerates every committed results CSV and byte-compares it
+  (`python/reproduce.py`).
+
+CI runs it on every push. `.github/workflows/regression.yml` also runs a
+nightly job with ASan on the RTL plus all mutation checks. All sweep and
+check scripts take `--jobs N` (default: all CPUs), and their output is
+identical for every N.
+
+Per phase:
+
 | Result | Command | Output |
 |---|---|---|
 | All Phase 1 results, each on a clean tree | `scripts/phase1_results.sh` | both files below |
@@ -135,6 +178,10 @@ configure with `-DAPM_RTL=OFF` to skip it.
 | All Phase 5 results, each on a clean tree | `scripts/phase5_results.sh` | the files below |
 | Phase 5 exit criterion: RTL lint, hand traces, full correlation, bank-map tests, sweeps S1/S2 | `scripts/phase5_exit.sh` | `results/phase5/exit_criterion.txt`, `correlation.csv`, `sweep.csv`, `bank_map.png`, `arrangements.png` |
 | Phase 5 mutation check | `scripts/phase5_mutation_check.sh` | `results/phase5/mutation_check.txt` |
+| All Phase 6 results (Codespace part), each on a clean tree | `scripts/phase6_results.sh` | the files below |
+| Phase 6 exit criterion: push-job regression with step times, reproduction of all results CSVs, runner speedup | `scripts/phase6_exit.sh` | `results/phase6/exit_criterion.txt`, `regression_runtime.txt`, `runner_speedup.txt` |
+| Phase 6 mutation check | `scripts/phase6_mutation_check.sh` | `results/phase6/mutation_check.txt` |
+| GitHub Actions run and step times | `scripts/phase6_ci_times.sh OUT RUN_ID...` | `results/phase6/ci_runtime.txt` |
 | Every number in RESULTS.md | `scripts/check_results.sh` | pass/fail |
 
 Every results file starts with a provenance block (`scripts/env_report.sh`):
@@ -147,6 +194,7 @@ commit, clean/dirty tree, machine, and tool versions.
 - [docs/phase3-design.md](docs/phase3-design.md): Phase 3 design note
 - [docs/phase4-design.md](docs/phase4-design.md): Phase 4 design note
 - [docs/phase5-design.md](docs/phase5-design.md): Phase 5 design note
+- [docs/phase6-design.md](docs/phase6-design.md): Phase 6 design note
 - [docs/CORRELATION.md](docs/CORRELATION.md): RTL vs model correlation method and deviation log
 - [RESULTS.md](RESULTS.md): measured results and hypothesis verdicts
 - [docs/BUGS.md](docs/BUGS.md): every bug found, and how it was detected

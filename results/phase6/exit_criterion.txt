@@ -1,0 +1,86 @@
+# Phase 6 exit criterion: parallel runner, result reproduction, regression runtime
+command: scripts/phase6_exit.sh
+
+## Provenance
+date_utc: 2026-10-15T00:21:34Z
+commit: 5fb22825ed38af5ec239d8431dccfb02f4e0775f
+tree: clean
+host: Linux 6.8.0-1064-azure x86_64
+os: Ubuntu 24.04.3 LTS
+lscpu:
+  Architecture:                            x86_64
+  CPU(s):                                  2
+  Model name:                              AMD EPYC 7763 64-Core Processor
+  Thread(s) per core:                      2
+  Core(s) per socket:                      1
+  Socket(s):                               1
+  L1d cache:                               32 KiB (1 instance)
+  L1i cache:                               32 KiB (1 instance)
+  L2 cache:                                512 KiB (1 instance)
+  L3 cache:                                32 MiB (1 instance)
+mem_total: 8132884 kB
+tools:
+  c++: c++ (Ubuntu 13.3.0-6ubuntu2~24.04) 13.3.0
+  cmake: cmake version 3.28.3
+  ninja: 1.11.1
+  systemc: 3.0.2 (release date 20251031) at /opt/systemc-3.0.2, commit 70b0fc8e4a74acc677b0fc73cea08f940c2115d5
+  googletest: 52eb8108c5bdec04579160ae17225d66034bd723  # v1.17.0
+  python3: Python 3.12.3
+  numpy: 1.26.4
+  verilator: Verilator 5.020 2024-01-01 rev (Debian 5.020-1)
+
+## Regression steps (push job, run in this Codespace)
+# Regression runtime (push steps)
+host: Linux 6.8.0-1064-azure x86_64, cpus: 2
+
+| step | seconds | result |
+|---|---|---|
+| release_build                  |     296 | pass |
+| release_ctest                  |       5 | pass |
+| asan_build_without_rtl         |     136 | pass |
+| asan_ctest                     |      14 | pass |
+| check_results                  |       0 | pass |
+| reproduce_results_csvs         |     108 | pass |
+| TOTAL                          |     559 | pass |
+regression exit status: 0
+
+## CTest summary: release
+100% tests passed, 0 tests failed out of 132
+determinism    =   0.10 sec*proc (2 tests)
+functional     =   1.88 sec*proc (4 tests)
+rtl            =   1.06 sec*proc (6 tests)
+runner         =   4.58 sec*proc (4 tests)
+sim            =   0.33 sec*proc (37 tests)
+unit           =   0.30 sec*proc (79 tests)
+failed tests: none
+
+## CTest summary: asan
+100% tests passed, 0 tests failed out of 126
+determinism    =   0.50 sec*proc (2 tests)
+functional     =   7.50 sec*proc (4 tests)
+runner         =  11.82 sec*proc (4 tests)
+sim            =   2.53 sec*proc (37 tests)
+unit           =   3.02 sec*proc (79 tests)
+failed tests: none
+
+## RESULTS.md number check
+check-results-numbers: all 149 numbers in RESULTS.md appear in the generated results
+
+## Reproduction of the committed results CSVs
+reproduce: results/phase2/functional.csv IDENTICAL (201 lines) script_exit=0 wall_s=1.1
+reproduce: results/phase3/functional_accel.csv IDENTICAL (101 lines) script_exit=0 wall_s=0.6
+reproduce: results/phase3/sweep.csv IDENTICAL (116 lines) script_exit=0 wall_s=2.1
+reproduce: results/phase4/functional_gemm.csv IDENTICAL (201 lines) script_exit=0 wall_s=1.1
+reproduce: results/phase4/functional_attn.csv IDENTICAL (81 lines) script_exit=0 wall_s=1.6
+reproduce: results/phase4/study.csv IDENTICAL (55 lines) script_exit=0 wall_s=40.3
+reproduce: results/phase5/correlation.csv IDENTICAL (313 lines) script_exit=0 wall_s=5.8
+reproduce: results/phase5/sweep.csv IDENTICAL (43 lines) script_exit=0 wall_s=55.1
+reproduce: files=8 identical=8 jobs=2 wall_s=107.7
+
+## Runner speedup
+| script | jobs | wall s | CSV identical to --jobs 1 |
+|---|---|---|---|
+| study_p4.py | 1 | 49.0 | yes |
+| study_p4.py | 2 | 39.5 | yes |
+| sweep_p5.py | 1 | 70.7 | yes |
+| sweep_p5.py | 2 | 55.5 | yes |

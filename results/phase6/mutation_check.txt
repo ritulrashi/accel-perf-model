@@ -1,0 +1,70 @@
+# Phase 6 mutation check: do the tests, stall-stack assertions and functional checks detect injected bugs?
+command: scripts/phase6_mutation_check.sh
+
+## Provenance (of the unmutated tree the mutants were derived from)
+date_utc: 2026-10-15T00:34:29Z
+commit: 5fb22825ed38af5ec239d8431dccfb02f4e0775f
+tree: clean
+host: Linux 6.8.0-1064-azure x86_64
+os: Ubuntu 24.04.3 LTS
+lscpu:
+  Architecture:                            x86_64
+  CPU(s):                                  2
+  Model name:                              AMD EPYC 7763 64-Core Processor
+  Thread(s) per core:                      2
+  Core(s) per socket:                      1
+  Socket(s):                               1
+  L1d cache:                               32 KiB (1 instance)
+  L1i cache:                               32 KiB (1 instance)
+  L2 cache:                                512 KiB (1 instance)
+  L3 cache:                                32 MiB (1 instance)
+mem_total: 8132884 kB
+tools:
+  c++: c++ (Ubuntu 13.3.0-6ubuntu2~24.04) 13.3.0
+  cmake: cmake version 3.28.3
+  ninja: 1.11.1
+  systemc: 3.0.2 (release date 20251031) at /opt/systemc-3.0.2, commit 70b0fc8e4a74acc677b0fc73cea08f940c2115d5
+  googletest: 52eb8108c5bdec04579160ae17225d66034bd723  # v1.17.0
+  python3: Python 3.12.3
+  numpy: 1.26.4
+  verilator: Verilator 5.020 2024-01-01 rev (Debian 5.020-1)
+
+## Baseline (unmutated copy)
+ctest: tests passed, 0 tests failed out of 132
+failing tests: none
+
+## P1 (python/runner.py)
+42:        for t, f in ((fut_task[f], f) for f in as_completed(futs)):  # MUTANT P1 completion order
+failing tests (3):
+  runner.jobs_attn
+  runner.jobs_gemm
+  runner.selftest
+required: runner.selftest
+verdict: CAUGHT
+
+## P2 (python/runner.py)
+46:                out.append((t, None, None))  # MUTANT P2 exception dropped
+failing tests (1):
+  runner.selftest
+required: runner.selftest
+verdict: CAUGHT
+
+## P3 (python/reproduce.py)
+59:    if len(committed.splitlines()) == len(regenerated.splitlines()):  # MUTANT P3 line counts only
+failing tests (1):
+  runner.reproduce_selftest
+required: runner.reproduce_selftest
+verdict: CAUGHT
+
+## P4 (python/gemm_check.py)
+184:    for tmp in ["/tmp"]:  # MUTANT P4 shared temp dir
+failing tests (4):
+  functional.accel20
+  functional.accel_prec20
+  functional.gemm20
+  runner.jobs_gemm
+required: runner.jobs_gemm
+verdict: CAUGHT
+
+## Result
+all mutants caught by their required tests: yes

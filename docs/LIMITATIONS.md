@@ -190,3 +190,18 @@ What this project does **not** model or verify. Updated every phase.
 - **Sweeps:** each point is a single configuration (A4 timing parameters,
   W = 64, mesh L = 64, SRAM at the corner, 1024 MACs in S2). The results rank
   arrangements of this model under these parameters, not real designs.
+
+## Automation and CI (Phase 6)
+- **Reproduction compares CSVs only.** Text reports (with provenance and
+  wall times) and PNGs are not compared byte for byte. A change that only
+  alters a plot, or a number printed only in a text report, would not fail
+  reproduction. The RESULTS.md checker covers the numbers quoted in
+  RESULTS.md.
+- **The push job builds ASan without the RTL** (to stay near 5 minutes).
+  The RTL is covered by the release build on every push, and under ASan only
+  by the nightly job.
+- **Mutation checks run nightly, not on push.** A change that makes a
+  mutant undetectable is noticed within a day, not at the push itself.
+- **Runtimes are single measurements** on shared cloud machines (GitHub
+  runners, a Codespace with 2 SMT threads on one core). They vary run to run
+  and are reported as measured, not averaged.

@@ -1,6 +1,6 @@
 # Phase 6 Design Note — Parallel Runner, Result Reproduction, CI
 
-Status: **approved 2026-10-14 (user: "go"); implementing**
+Status: **approved 2026-10-14 (user: "go"); implemented**
 
 ## 0. What Phase 6 adds
 

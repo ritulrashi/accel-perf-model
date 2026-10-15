@@ -386,3 +386,78 @@ T(16)/T(1) drops to ≤ 2.0.** **Partly refuted.**
 - **The next experiments that would move the numbers** are a row-buffer-
   aware controller and fused attention (no S round trip). Neither is in
   this project; both are listed in LIMITATIONS.
+
+## Phase 6: parallel runner, result reproduction, CI
+
+Measured at commit 5fb2282. Codespace part by `scripts/phase6_results.sh`:
+[exit_criterion.txt](results/phase6/exit_criterion.txt),
+[regression_runtime.txt](results/phase6/regression_runtime.txt),
+[runner_speedup.txt](results/phase6/runner_speedup.txt),
+[mutation_check.txt](results/phase6/mutation_check.txt). GitHub Actions part
+by `scripts/phase6_ci_times.sh`: [ci_runtime.txt](results/phase6/ci_runtime.txt).
+
+- **Tests:** both presets pass: 132 tests in release; 126 in ASan, which is
+  built without the RTL.
+- **Mutation check:** all 4 Phase 6 mutants are caught. The runner
+  returning completion order and the runner dropping an exception are each
+  caught by the self-test; a reproduction comparing only line counts and
+  `gemm_check` sharing one temp directory between parallel cases are caught
+  by their tests too.
+- **CI:** the push job is green on 5fb2282, and so is a manually dispatched
+  `full` job (ASan with RTL plus every phase's mutation check).
+
+### Hypotheses (written in the design note §8 before measuring)
+
+**H1: all 8 committed results CSVs reproduce byte-identically at HEAD.**
+**Confirmed.** All 8 files are identical in the Codespace (with the
+default 2 workers) and in every CI push job (4 workers): 201 + 101 + 116 +
+201 + 81 + 55 + 313 + 43 lines. That includes the Phase 2 and Phase 3
+files, generated before Phases 4–5 generalized the PE, layout, scheduler
+and DRAM map. So no later phase moved a published number.
+
+**H2: `--jobs 2` makes `study_p4.py` and `sweep_p5.py` ≥ 1.6× faster in
+the Codespace.** **Refuted.**
+
+| Script | --jobs 1 | --jobs 2 | CSV identical |
+|---|---|---|---|
+| study_p4.py | 49.0 s | 39.5 s | yes |
+| sweep_p5.py | 70.7 s | 55.5 s | yes |
+
+The speedups are about 1.24× and 1.27×. The Codespace's "2 CPUs" are one
+physical core with two SMT threads (`Thread(s) per core: 2`,
+`Core(s) per socket: 1` in the provenance block). Two workers therefore
+share one core's execution units. My prediction assumed two independent
+cores. The outputs are byte-identical either way, which is the property
+the runner must guarantee.
+
+**H3: the push job takes ≤ 20 min on the GitHub runner.** **Confirmed.**
+
+| Run | Commit | Job wall time | of which regression steps |
+|---|---|---|---|
+| first push, SystemC built from source | b05b5ac | 348 s | 279 s |
+| push, SystemC restored from the cache | 5fb2282 | 318 s | 278 s |
+
+The runner reports 4 CPUs. The regression steps on the 4-CPU runner (278 s)
+are about twice as fast as the same steps in the Codespace (559 s,
+[regression_runtime.txt](results/phase6/regression_runtime.txt)).
+
+**H4: the nightly `full` job takes ≤ 120 min.** **Confirmed:** 2124 s
+(35.4 min) on 5fb2282, of which the ASan build with the 14 RTL variants
+takes 527 s and the five mutation checks 189 + 194 + 193 + 203 + 579 s.
+- **The first `full` run (b05b5ac) failed, usefully.** The Phase 1 and
+  Phase 2 mutation checks reported that three of their `sed` patterns no
+  longer matched code that later phases had rewritten.
+- The harness refused to run those mutants rather than pass them, so no
+  wrong verdict was produced.
+- The patterns were updated with the same mutated behaviour
+  ([BUGS.md](docs/BUGS.md) #14), and the second run is green. Mutation
+  checks rot as code evolves, and only a job that reruns them at HEAD
+  notices.
+
+### Total regression runtime
+
+| Where | What | Wall time |
+|---|---|---|
+| GitHub Actions, ubuntu-24.04, 4 CPUs | push job (both builds, all tests, RESULTS.md numbers, reproduction of all results CSVs) | 318 s |
+| GitHub Actions, same runner | `full` job (ASan with RTL, plus all five mutation checks) | 2124 s |
+| Codespace, 1 core / 2 threads | the push job's regression steps | 559 s |

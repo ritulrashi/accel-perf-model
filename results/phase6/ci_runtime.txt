@@ -1,0 +1,133 @@
+# GitHub Actions regression runtime
+command: scripts/phase6_ci_times.sh results/phase6/ci_runtime.txt 38656108569 38659542666 38656738161 38659569907
+
+## Provenance (of this query; the runs record their own commit below)
+date_utc: 2026-10-15T01:00:04Z
+local_commit: 8a0f8812062d0a15f8223b76c6cfa9e33c8c8283
+gh: gh version 2.102.0 (2026-09-30)
+
+## Run 38656108569 (push, workflow regression): success
+url: https://github.com/ritulrashi/accel-perf-model/actions/runs/38656108569
+head_sha: b05b5ac27e9792c049aa52ead99baabfe6eb0262
+job regression: success, wall 348 s (5.8 min)
+| step | seconds | result |
+|---|---|---|
+| Set up job | 1 | success |
+| Run actions/checkout@v4 | 1 | success |
+| Prepare the SystemC prefix for the cache | 0 | success |
+| Restore SystemC (pinned commit) | 0 | success |
+| Install toolchain (same script as the dev container) | 62 | success |
+| Tool versions | 1 | success |
+| Regression (release + RTL, ASan, RESULTS.md numbers, reproduction of every results CSV) | 279 | success |
+| Timing summary | 0 | success |
+| Run actions/upload-artifact@v4 | 1 | success |
+| Post Restore SystemC (pinned commit) | 1 | success |
+| Post Run actions/checkout@v4 | 0 | success |
+| Complete job | 0 | success |
+job full: skipped (not triggered by this event)
+regression steps inside the job (scripts/phase6_regression.sh table, from the job log):
+host: Linux 6.17.0-1022-azure x86_64, cpus: 4
+| release_build                  |     149 | pass |
+| release_ctest                  |       4 | pass |
+| asan_build_without_rtl         |      61 | pass |
+| asan_ctest                     |       8 | pass |
+| check_results                  |       0 | pass |
+| reproduce_results_csvs         |      57 | pass |
+| TOTAL                          |     279 | pass |
+
+## Run 38659542666 (push, workflow regression): success
+url: https://github.com/ritulrashi/accel-perf-model/actions/runs/38659542666
+head_sha: 5fb22825ed38af5ec239d8431dccfb02f4e0775f
+job regression: success, wall 318 s (5.3 min)
+| step | seconds | result |
+|---|---|---|
+| Set up job | 2 | success |
+| Run actions/checkout@v4 | 1 | success |
+| Prepare the SystemC prefix for the cache | 0 | success |
+| Restore SystemC (pinned commit) | 1 | success |
+| Install toolchain (same script as the dev container) | 30 | success |
+| Tool versions | 1 | success |
+| Regression (release + RTL, ASan, RESULTS.md numbers, reproduction of every results CSV) | 278 | success |
+| Timing summary | 0 | success |
+| Run actions/upload-artifact@v4 | 1 | success |
+| Post Restore SystemC (pinned commit) | 0 | success |
+| Post Run actions/checkout@v4 | 0 | success |
+| Complete job | 0 | success |
+job full: skipped (not triggered by this event)
+regression steps inside the job (scripts/phase6_regression.sh table, from the job log):
+host: Linux 6.17.0-1022-azure x86_64, cpus: 4
+| release_build                  |     148 | pass |
+| release_ctest                  |       4 | pass |
+| asan_build_without_rtl         |      61 | pass |
+| asan_ctest                     |       7 | pass |
+| check_results                  |       0 | pass |
+| reproduce_results_csvs         |      58 | pass |
+| TOTAL                          |     278 | pass |
+
+## Run 38656738161 (workflow_dispatch, workflow regression): failure
+url: https://github.com/ritulrashi/accel-perf-model/actions/runs/38656738161
+head_sha: b05b5ac27e9792c049aa52ead99baabfe6eb0262
+job full: failure, wall 1638 s (27.3 min)
+| step | seconds | result |
+|---|---|---|
+| Set up job | 1 | success |
+| Run actions/checkout@v4 | 1 | success |
+| Prepare the SystemC prefix for the cache | 0 | success |
+| Restore SystemC (pinned commit) | 0 | success |
+| Install toolchain (same script as the dev container) | 24 | success |
+| Tool versions | 1 | success |
+| Full regression (ASan with RTL, mutation checks of Phases 1-5) | 1608 | failure |
+| Timing summary | 0 | success |
+| Run actions/upload-artifact@v4 | 1 | success |
+| Post Restore SystemC (pinned commit) | 0 | skipped |
+| Post Run actions/checkout@v4 | 0 | success |
+| Complete job | 0 | success |
+job regression: skipped (not triggered by this event)
+regression steps inside the job (scripts/phase6_regression.sh table, from the job log):
+host: Linux 6.17.0-1022-azure x86_64, cpus: 4
+| release_build                  |      93 | pass |
+| release_ctest                  |       4 | pass |
+| asan_build_with_rtl            |     418 | pass |
+| asan_ctest                     |       5 | pass |
+| check_results                  |       0 | pass |
+| reproduce_results_csvs         |      38 | pass |
+| mutation_check_phase1          |     143 | FAIL (exit 1) |
+| mutation_check_phase2          |     145 | FAIL (exit 1) |
+| mutation_check_phase3          |     154 | pass |
+| mutation_check_phase4          |     162 | pass |
+| mutation_check_phase5          |     446 | pass |
+| TOTAL                          |    1608 | FAIL |
+
+## Run 38659569907 (workflow_dispatch, workflow regression): success
+url: https://github.com/ritulrashi/accel-perf-model/actions/runs/38659569907
+head_sha: 5fb22825ed38af5ec239d8431dccfb02f4e0775f
+job full: success, wall 2124 s (35.4 min)
+| step | seconds | result |
+|---|---|---|
+| Set up job | 1 | success |
+| Run actions/checkout@v4 | 1 | success |
+| Prepare the SystemC prefix for the cache | 0 | success |
+| Restore SystemC (pinned commit) | 2 | success |
+| Install toolchain (same script as the dev container) | 38 | success |
+| Tool versions | 2 | success |
+| Full regression (ASan with RTL, mutation checks of Phases 1-5) | 2075 | success |
+| Timing summary | 0 | success |
+| Run actions/upload-artifact@v4 | 1 | success |
+| Post Restore SystemC (pinned commit) | 0 | success |
+| Post Run actions/checkout@v4 | 0 | success |
+| Complete job | 0 | success |
+job regression: skipped (not triggered by this event)
+regression steps inside the job (scripts/phase6_regression.sh table, from the job log):
+host: Linux 6.17.0-1022-azure x86_64, cpus: 4
+| release_build                  |     132 | pass |
+| release_ctest                  |       5 | pass |
+| asan_build_with_rtl            |     527 | pass |
+| asan_ctest                     |       7 | pass |
+| check_results                  |       0 | pass |
+| reproduce_results_csvs         |      46 | pass |
+| mutation_check_phase1          |     189 | pass |
+| mutation_check_phase2          |     194 | pass |
+| mutation_check_phase3          |     193 | pass |
+| mutation_check_phase4          |     203 | pass |
+| mutation_check_phase5          |     579 | pass |
+| TOTAL                          |    2075 | pass |

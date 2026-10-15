@@ -1,0 +1,45 @@
+# Phase 6 regression runtime, Codespace (the CI push-job steps)
+command: scripts/phase6_regression.sh (via scripts/phase6_exit.sh)
+
+## Provenance
+date_utc: 2026-10-15T00:21:34Z
+commit: 5fb22825ed38af5ec239d8431dccfb02f4e0775f
+tree: clean
+host: Linux 6.8.0-1064-azure x86_64
+os: Ubuntu 24.04.3 LTS
+lscpu:
+  Architecture:                            x86_64
+  CPU(s):                                  2
+  Model name:                              AMD EPYC 7763 64-Core Processor
+  Thread(s) per core:                      2
+  Core(s) per socket:                      1
+  Socket(s):                               1
+  L1d cache:                               32 KiB (1 instance)
+  L1i cache:                               32 KiB (1 instance)
+  L2 cache:                                512 KiB (1 instance)
+  L3 cache:                                32 MiB (1 instance)
+mem_total: 8132884 kB
+tools:
+  c++: c++ (Ubuntu 13.3.0-6ubuntu2~24.04) 13.3.0
+  cmake: cmake version 3.28.3
+  ninja: 1.11.1
+  systemc: 3.0.2 (release date 20251031) at /opt/systemc-3.0.2, commit 70b0fc8e4a74acc677b0fc73cea08f940c2115d5
+  googletest: 52eb8108c5bdec04579160ae17225d66034bd723  # v1.17.0
+  python3: Python 3.12.3
+  numpy: 1.26.4
+  verilator: Verilator 5.020 2024-01-01 rev (Debian 5.020-1)
+
+# Regression runtime (push steps)
+host: Linux 6.8.0-1064-azure x86_64, cpus: 2
+
+| step | seconds | result |
+|---|---|---|
+| release_build                  |     296 | pass |
+| release_ctest                  |       5 | pass |
+| asan_build_without_rtl         |     136 | pass |
+| asan_ctest                     |      14 | pass |
+| check_results                  |       0 | pass |
+| reproduce_results_csvs         |     108 | pass |
+| TOTAL                          |     559 | pass |
+
+regression exit status: 0
