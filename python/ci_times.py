@@ -17,6 +17,9 @@ def main():
     print(f"url: {r['url']}")
     print(f"head_sha: {r['headSha']}")
     for j in r["jobs"]:
+        if j["conclusion"] == "skipped":
+            print(f"job {j['name']}: skipped (not triggered by this event)")
+            continue
         jt = int((ts(j["completedAt"]) - ts(j["startedAt"])).total_seconds())
         print(f"job {j['name']}: {j['conclusion']}, wall {jt} s ({jt / 60:.1f} min)")
         print("| step | seconds | result |")
